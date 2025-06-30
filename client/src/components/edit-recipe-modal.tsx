@@ -13,6 +13,19 @@ import { insertRecipeSchema, InsertRecipe, Recipe } from "@shared/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const formSchema = insertRecipeSchema.extend({
+  ingredients: z.array(z.object({
+    sectionName: z.string().optional(),
+    items: z.array(z.object({
+      name: z.string().min(1, "Ingredient name is required"),
+      quantity: z.string().optional(),
+      unit: z.string().optional(),
+    })).min(1, "At least one ingredient is required"),
+  })).min(1, "At least one ingredient section is required"),
+  instructions: z.array(z.string()).min(1, "At least one instruction is required"),
+});
 
 interface EditRecipeModalProps {
   recipe: Recipe | null;
@@ -21,7 +34,10 @@ interface EditRecipeModalProps {
 }
 
 export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalProps) {
-  const [ingredients, setIngredients] = useState<string[]>([""]);
+  const [ingredientSections, setIngredientSections] = useState<{
+    sectionName?: string;
+    items: { name: string; quantity?: string; unit?: string; }[];
+  }[]>([{ items: [{ name: "" }] }]);
   const [instructions, setInstructions] = useState<string[]>([""]);
   const [servingSize, setServingSize] = useState(4);
   const queryClient = useQueryClient();
@@ -35,8 +51,8 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     reset,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<InsertRecipe>({
-    resolver: zodResolver(insertRecipeSchema),
+  } = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
       description: "",
@@ -67,7 +83,13 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
         isFavorite: recipe.isFavorite || false,
       });
       
-      setIngredients(recipe.ingredients || [""]);
+      // Convert recipe ingredients to editable format
+      if (recipe.ingredients && recipe.ingredients.length > 0) {
+        setIngredientSections(recipe.ingredients);
+      } else {
+        setIngredientSections([{ items: [{ name: "" }] }]);
+      }
+      
       setInstructions(recipe.instructions || [""]);
       setServingSize(recipe.servings || 4);
       setValue("servings", recipe.servings || 4);
@@ -97,11 +119,17 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     },
   });
 
-  const onSubmit = (data: InsertRecipe) => {
-    const filteredIngredients = ingredients.filter(ingredient => ingredient.trim() !== "");
+  const onSubmit = (data: z.infer<typeof formSchema>) => {
+    const filteredSections = ingredientSections
+      .map(section => ({
+        ...section,
+        items: section.items.filter(item => item.name.trim() !== "")
+      }))
+      .filter(section => section.items.length > 0);
+    
     const filteredInstructions = instructions.filter(instruction => instruction.trim() !== "");
     
-    if (filteredIngredients.length === 0) {
+    if (filteredSections.length === 0) {
       toast({
         title: "Error",
         description: "Please add at least one ingredient.",
@@ -121,7 +149,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
 
     updateMutation.mutate({
       ...data,
-      ingredients: filteredIngredients,
+      ingredients: filteredSections,
       instructions: filteredInstructions,
       servings: servingSize,
     });
