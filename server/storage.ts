@@ -604,5 +604,5 @@ class MemoryStorage implements IStorage {
   }
 }
 
-// Using memory storage for immediate functionality - switch to Firebase once permissions are fixed
-export const storage = new MemoryStorage();
+// Using Firebase storage for production
+export const storage = new FirebaseStorage();
