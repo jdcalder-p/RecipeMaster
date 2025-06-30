@@ -287,6 +287,7 @@ export class RecipeScraper {
     const cookTime = this.extractBySelectors($, selectors.cookTime);
     const servings = this.parseServings(this.extractBySelectors($, selectors.servings));
     const imageUrl = this.extractImageBySelectors($, selectors.image, url);
+    const videoUrl = RecipeScraper.extractVideoUrl($);
 
     return {
       title: title || 'Imported Recipe',
@@ -305,6 +306,7 @@ export class RecipeScraper {
           : [],
       instructions: instructions.filter(Boolean),
       imageUrl,
+      videoUrl,
     };
   }
 
@@ -440,10 +442,18 @@ export class RecipeScraper {
   }
 
   private static extractInstructionsBySelectors($: cheerio.CheerioAPI, selectors: string[]): string[] {
-    for (const selector of selectors) {
+    console.log(`Starting instruction extraction with ${selectors.length} selectors`);
+    
+    for (let i = 0; i < selectors.length; i++) {
+      const selector = selectors[i];
+      console.log(`Trying selector ${i + 1}/${selectors.length}: "${selector}"`);
+      
       const elements = $(selector);
+      console.log(`Found ${elements.length} elements for selector: ${selector}`);
+      
       if (elements.length > 0) {
         let instructions = elements.map((_, el) => $(el).text().trim()).get();
+        console.log(`Raw instructions from selector "${selector}":`, instructions.slice(0, 3));
         
         // Handle case where instructions might be concatenated in a single element
         instructions = instructions.flatMap((inst: string) => {
@@ -462,12 +472,16 @@ export class RecipeScraper {
           !inst.toLowerCase().includes('subscribe')
         );
         
+        console.log(`Filtered to ${filteredInstructions.length} instructions from selector "${selector}":`, filteredInstructions.slice(0, 3));
+        
         if (filteredInstructions.length > 0) {
+          console.log(`SUCCESS: Using ${filteredInstructions.length} instructions from selector: ${selector}`);
           return filteredInstructions;
         }
       }
     }
     
+    console.log(`No instructions found with any selector`);
     return [];
   }
 
@@ -532,6 +546,46 @@ export class RecipeScraper {
     });
     
     return ingredientLines.slice(0, 20); // Limit to reasonable number
+  }
+
+  private static extractVideoUrl($: cheerio.CheerioAPI): string {
+    // Look for YouTube, Vimeo, or other video embeds
+    const videoSelectors = [
+      'iframe[src*="youtube.com"]',
+      'iframe[src*="youtu.be"]', 
+      'iframe[src*="vimeo.com"]',
+      'iframe[src*="dailymotion.com"]',
+      'video source',
+      '.video-container iframe',
+      '.recipe-video iframe',
+      '[data-video-url]',
+      'a[href*="youtube.com"]',
+      'a[href*="youtu.be"]',
+      'a[href*="vimeo.com"]',
+    ];
+
+    for (const selector of videoSelectors) {
+      const element = $(selector).first();
+      if (element.length) {
+        // For iframes, get src attribute
+        const src = element.attr('src');
+        if (src && (src.includes('youtube') || src.includes('vimeo') || src.includes('dailymotion'))) {
+          return src.startsWith('//') ? `https:${src}` : src;
+        }
+        
+        // For links, get href attribute
+        const href = element.attr('href');
+        if (href && (href.includes('youtube') || href.includes('youtu.be') || href.includes('vimeo'))) {
+          return href;
+        }
+        
+        // For data attributes
+        const dataUrl = element.attr('data-video-url');
+        if (dataUrl) return dataUrl;
+      }
+    }
+    
+    return '';
   }
 
   private static extractImageBySelectors($: cheerio.CheerioAPI, selectors: string[], baseUrl: string): string {
