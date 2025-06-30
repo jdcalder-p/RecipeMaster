@@ -1,10 +1,77 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChefHat, Calendar, ShoppingCart, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Landing() {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithEmail, signUpWithEmail } = useAuth();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsLoading(true);
+    
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    
+    try {
+      await signInWithEmail(email, password);
+      toast({
+        title: "Success",
+        description: "You have been signed in successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Sign In Failed",
+        description: error.message || "Please check your credentials and try again.",
+        variant: "destructive",
+      });
+    }
+    setIsLoading(false);
+  };
+  
+  const handleSignUp = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsLoading(true);
+    
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirmPassword") as string;
+    
+    if (password !== confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "Passwords do not match.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      await signUpWithEmail(email, password);
+      toast({
+        title: "Account Created",
+        description: "Your account has been created successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Sign Up Failed",
+        description: error.message || "Please try again with different credentials.",
+        variant: "destructive",
+      });
+    }
+    setIsLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
       <div className="max-w-6xl mx-auto px-4 py-12">
@@ -19,13 +86,110 @@ export default function Landing() {
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Organize your recipes, plan your meals, and generate shopping lists with our intuitive recipe management system.
           </p>
-          <Button 
-            onClick={signInWithGoogle}
-            size="lg" 
-            className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 text-lg"
-          >
-            Sign In with Google
-          </Button>
+          
+          {/* Authentication Forms */}
+          <div className="max-w-md mx-auto">
+            <Tabs defaultValue="signin" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="signin">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Sign In</CardTitle>
+                    <CardDescription>
+                      Sign in to your account to manage your recipes
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSignIn} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="signin-email">Email</Label>
+                        <Input
+                          id="signin-email"
+                          name="email"
+                          type="email"
+                          placeholder="your@email.com"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signin-password">Password</Label>
+                        <Input
+                          id="signin-password"
+                          name="password"
+                          type="password"
+                          placeholder="Enter your password"
+                          required
+                        />
+                      </div>
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-orange-600 hover:bg-orange-700"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Signing In..." : "Sign In"}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="signup">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Create Account</CardTitle>
+                    <CardDescription>
+                      Create a new account to get started
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSignUp} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-email">Email</Label>
+                        <Input
+                          id="signup-email"
+                          name="email"
+                          type="email"
+                          placeholder="your@email.com"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-password">Password</Label>
+                        <Input
+                          id="signup-password"
+                          name="password"
+                          type="password"
+                          placeholder="Create a password"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                        <Input
+                          id="signup-confirm-password"
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="Confirm your password"
+                          required
+                        />
+                      </div>
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-orange-600 hover:bg-orange-700"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Creating Account..." : "Create Account"}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
 
         {/* Features Grid */}
@@ -123,14 +287,7 @@ export default function Landing() {
         {/* CTA */}
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Ready to get organized?</h2>
-          <p className="text-gray-600 mb-6">Sign in with your account to start managing your recipes today.</p>
-          <Button 
-            onClick={() => window.location.href = '/api/login'}
-            size="lg" 
-            className="bg-orange-600 hover:bg-orange-700 text-white"
-          >
-            Sign In Now
-          </Button>
+          <p className="text-gray-600 mb-6">Sign up above to start managing your recipes today.</p>
         </div>
       </div>
     </div>
