@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Download, Save } from "lucide-react";
+import { Plus, Minus, Trash2, Download, Save } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertRecipeSchema, InsertRecipe } from "@shared/schema";
@@ -28,7 +28,7 @@ interface AddRecipeModalProps {
 export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   const [importUrl, setImportUrl] = useState("");
   const [ingredients, setIngredients] = useState<string[]>([""]);
-  const [instructions, setInstructions] = useState<Array<{text: string; imageUrl?: string}>>([{text: ""}]);
+  const [instructions, setInstructions] = useState<string[]>([""]);
   const [servingSize, setServingSize] = useState(4);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -273,12 +273,39 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
               </div>
               <div>
                 <Label htmlFor="servings">Servings</Label>
-                <Input
-                  id="servings"
-                  type="number"
-                  {...register("servings", { valueAsNumber: true })}
-                  placeholder="4"
-                />
+                <div className="flex items-center space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newSize = Math.max(1, servingSize - 1);
+                      setServingSize(newSize);
+                      setValue("servings", newSize);
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <span className="min-w-[2rem] text-center font-medium">{servingSize}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newSize = servingSize + 1;
+                      setServingSize(newSize);
+                      setValue("servings", newSize);
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    type="hidden"
+                    {...register("servings", { valueAsNumber: true, value: servingSize })}
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="category">Category</Label>
@@ -355,29 +382,40 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
               <Label>Instructions</Label>
               <div className="space-y-2">
                 {instructions.map((instruction, index) => (
-                  <div key={index} className="flex items-start space-x-2">
-                    <span className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mt-1 flex-shrink-0">
-                      {index + 1}
-                    </span>
-                    <Textarea
-                      ref={(el) => { instructionRefs.current[index] = el; }}
-                      placeholder="Describe the cooking step..."
-                      value={instruction}
-                      onChange={(e) => updateInstruction(index, e.target.value)}
-                      className="flex-1"
-                      rows={2}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeInstruction(index)}
-                      disabled={instructions.length === 1}
-                      className="mt-1"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Card key={index} className="p-3">
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-2">
+                        <span className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mt-1 flex-shrink-0">
+                          {index + 1}
+                        </span>
+                        <Textarea
+                          ref={(el) => { instructionRefs.current[index] = el; }}
+                          placeholder="Describe the cooking step..."
+                          value={instruction}
+                          onChange={(e) => updateInstruction(index, e.target.value)}
+                          className="flex-1"
+                          rows={2}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeInstruction(index)}
+                          disabled={instructions.length === 1}
+                          className="mt-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="ml-8">
+                        <Label className="text-xs text-muted-foreground">Optional step image (URL)</Label>
+                        <Input
+                          placeholder="https://example.com/step-image.jpg"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </Card>
                 ))}
               </div>
               <Button
