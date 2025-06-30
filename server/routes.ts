@@ -9,10 +9,22 @@ import { z } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   // No setup required for Firebase auth
 
+  // Auth routes
+  app.get('/api/auth/user', verifyFirebaseToken, async (req: any, res) => {
+    try {
+      const userId = req.user.uid;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
   // Recipe routes
   app.get("/api/recipes", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const { search } = req.query;
       let recipes;
       
@@ -31,7 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/recipes/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const recipe = await storage.getRecipe(req.params.id, userId);
       if (!recipe) {
         return res.status(404).json({ message: "Recipe not found" });
@@ -45,7 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/recipes", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const recipeData = insertRecipeSchema.parse(req.body);
       const recipe = await storage.createRecipe(recipeData, userId);
       res.status(201).json(recipe);
@@ -60,7 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/recipes/import", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const { url } = req.body;
       
       if (!url || typeof url !== 'string') {
@@ -89,7 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/recipes/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const updates = req.body;
       const recipe = await storage.updateRecipe(req.params.id, updates, userId);
       res.json(recipe);
@@ -101,7 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/recipes/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       await storage.deleteRecipe(req.params.id, userId);
       res.status(204).send();
     } catch (error) {
@@ -113,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Meal plan routes
   app.get("/api/meal-plans", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const { startDate, endDate } = req.query;
       const mealPlans = await storage.getMealPlans(
         userId,
@@ -129,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/meal-plans", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const mealPlanData = insertMealPlanSchema.parse(req.body);
       const mealPlan = await storage.createMealPlan(mealPlanData, userId);
       res.status(201).json(mealPlan);
@@ -144,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/meal-plans/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const updates = req.body;
       const mealPlan = await storage.updateMealPlan(req.params.id, updates, userId);
       res.json(mealPlan);
@@ -156,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/meal-plans/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       await storage.deleteMealPlan(req.params.id, userId);
       res.status(204).send();
     } catch (error) {
@@ -168,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shopping list routes
   app.get("/api/shopping-list", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const items = await storage.getShoppingListItems(userId);
       res.json(items);
     } catch (error) {
@@ -179,7 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/shopping-list", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const itemData = insertShoppingListItemSchema.parse(req.body);
       const item = await storage.createShoppingListItem(itemData, userId);
       res.status(201).json(item);
@@ -194,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/shopping-list/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const updates = req.body;
       const item = await storage.updateShoppingListItem(req.params.id, updates, userId);
       res.json(item);
@@ -206,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/shopping-list/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       await storage.deleteShoppingListItem(req.params.id, userId);
       res.status(204).send();
     } catch (error) {
@@ -217,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/shopping-list/generate", verifyFirebaseToken, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.uid;
       const { startDate, endDate } = req.body;
       
       if (!startDate || !endDate) {
