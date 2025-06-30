@@ -43,7 +43,7 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
       return apiRequest("POST", "/api/meal-plans", {
         date: today,
         mealType: "dinner",
-        recipeId: parseInt(recipe.id)
+        recipeId: recipe.id
       });
     },
     onSuccess: () => {
