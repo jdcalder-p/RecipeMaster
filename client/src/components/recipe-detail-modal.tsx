@@ -1,7 +1,7 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, Star, Heart, ShoppingCart, X } from "lucide-react";
+import { Clock, Users, Star, Heart, ShoppingCart } from "lucide-react";
 import { Recipe } from "@shared/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -83,14 +83,6 @@ export function RecipeDetailModal({ recipe, open, onOpenChange }: RecipeDetailMo
             alt={recipe.title}
             className="w-full h-64 object-cover"
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-4 right-4 bg-white/90 hover:bg-white"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="p-6">
