@@ -56,7 +56,7 @@
   }
 
   body {
-    @apply font-sans antialiased bg-neutral text-foreground;
+    @apply font-sans antialiased bg-background text-foreground;
   }
 }
 

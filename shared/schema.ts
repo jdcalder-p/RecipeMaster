@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const recipes = pgTable("recipes", {
-  id: serial("id").primaryKey(),
+  id: text("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
   cookTime: text("cook_time"),
@@ -20,20 +20,20 @@ export const recipes = pgTable("recipes", {
 });
 
 export const mealPlans = pgTable("meal_plans", {
-  id: serial("id").primaryKey(),
+  id: text("id").primaryKey(),
   date: text("date").notNull(), // YYYY-MM-DD format
   mealType: text("meal_type").notNull(), // breakfast, lunch, dinner
-  recipeId: integer("recipe_id").references(() => recipes.id),
+  recipeId: text("recipe_id").references(() => recipes.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const shoppingListItems = pgTable("shopping_list_items", {
-  id: serial("id").primaryKey(),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
   quantity: text("quantity"),
   category: text("category"),
   isCompleted: boolean("is_completed").default(false),
-  recipeId: integer("recipe_id").references(() => recipes.id),
+  recipeId: text("recipe_id").references(() => recipes.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
