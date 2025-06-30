@@ -13,7 +13,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/user', verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.uid;
-      const user = await storage.getUser(userId);
+      let user = await storage.getUser(userId);
+      
+      // If user doesn't exist in our database, create them
+      if (!user) {
+        user = await storage.upsertUser({
+          id: userId,
+          email: req.user.email || null,
+          firstName: req.user.name?.split(' ')[0] || null,
+          lastName: req.user.name?.split(' ')[1] || null,
+          profileImageUrl: req.user.picture || null,
+        });
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
