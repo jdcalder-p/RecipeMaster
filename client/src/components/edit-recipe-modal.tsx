@@ -53,7 +53,12 @@ const standardizeUnit = (unit: string): string => {
   return unitMap[unitLower] || unit;
 };
 
-const formSchema = insertRecipeSchema;
+const formSchema = insertRecipeSchema.extend({
+  instructions: z.array(z.object({
+    text: z.string().min(1, "Instruction text is required"),
+    imageUrl: z.string().optional(),
+  })).min(1, "At least one instruction is required"),
+});
 
 interface EditRecipeModalProps {
   recipe: Recipe | null;
@@ -201,7 +206,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
       }))
       .filter(section => section.items.length > 0);
     
-    const filteredInstructions = instructions.filter(instruction => instruction.trim() !== "");
+    const filteredInstructions = instructions.filter(instruction => instruction.text.trim() !== "");
     
     if (filteredSections.length === 0) {
       toast({
@@ -578,8 +583,8 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
                           </span>
                           <Textarea
                             placeholder="Enter instruction..."
-                            value={instruction}
-                            onChange={(e) => updateInstruction(index, e.target.value)}
+                            value={instruction.text}
+                            onChange={(e) => updateInstruction(index, 'text', e.target.value)}
                             className="flex-1"
                             rows={2}
                           />
@@ -593,6 +598,26 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
+                        </div>
+                        <div className="ml-8">
+                          <Input
+                            placeholder="Optional photo URL for this step..."
+                            value={instruction.imageUrl || ""}
+                            onChange={(e) => updateInstruction(index, 'imageUrl', e.target.value)}
+                            className="text-sm"
+                          />
+                          {instruction.imageUrl && (
+                            <div className="mt-2">
+                              <img 
+                                src={instruction.imageUrl} 
+                                alt={`Step ${index + 1} preview`}
+                                className="rounded-lg max-w-full h-32 object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </Card>
