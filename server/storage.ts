@@ -481,5 +481,128 @@ export class PostgreSQLStorage implements IStorage {
   }
 }
 
-// Use Firebase storage (PostgreSQL has type issues to resolve)
-export const storage = new FirebaseStorage();
+// Temporary in-memory storage for immediate testing
+class MemoryStorage implements IStorage {
+  private recipes: Recipe[] = [];
+  private mealPlans: MealPlan[] = [];
+  private shoppingItems: ShoppingListItem[] = [];
+  private idCounter = 1;
+
+  async getRecipes(): Promise<Recipe[]> {
+    return [...this.recipes];
+  }
+
+  async getRecipe(id: string): Promise<Recipe | undefined> {
+    return this.recipes.find(r => r.id === id);
+  }
+
+  async createRecipe(recipe: InsertRecipe): Promise<Recipe> {
+    const newRecipe: Recipe = {
+      ...recipe,
+      id: `recipe_${this.idCounter++}`,
+      createdAt: new Date(),
+    };
+    this.recipes.push(newRecipe);
+    return newRecipe;
+  }
+
+  async updateRecipe(id: string, recipe: Partial<InsertRecipe>): Promise<Recipe> {
+    const index = this.recipes.findIndex(r => r.id === id);
+    if (index === -1) throw new Error('Recipe not found');
+    this.recipes[index] = { ...this.recipes[index], ...recipe };
+    return this.recipes[index];
+  }
+
+  async deleteRecipe(id: string): Promise<void> {
+    const index = this.recipes.findIndex(r => r.id === id);
+    if (index !== -1) this.recipes.splice(index, 1);
+  }
+
+  async searchRecipes(query: string): Promise<Recipe[]> {
+    return this.recipes.filter(r => 
+      r.title.toLowerCase().includes(query.toLowerCase())
+    );
+  }
+
+  async getMealPlans(startDate?: string, endDate?: string): Promise<MealPlan[]> {
+    let filtered = [...this.mealPlans];
+    if (startDate) filtered = filtered.filter(mp => mp.date >= startDate);
+    if (endDate) filtered = filtered.filter(mp => mp.date <= endDate);
+    return filtered;
+  }
+
+  async createMealPlan(mealPlan: InsertMealPlan): Promise<MealPlan> {
+    const newPlan: MealPlan = {
+      ...mealPlan,
+      id: `plan_${this.idCounter++}`,
+      createdAt: new Date(),
+    };
+    this.mealPlans.push(newPlan);
+    return newPlan;
+  }
+
+  async updateMealPlan(id: string, mealPlan: Partial<InsertMealPlan>): Promise<MealPlan> {
+    const index = this.mealPlans.findIndex(mp => mp.id === id);
+    if (index === -1) throw new Error('Meal plan not found');
+    this.mealPlans[index] = { ...this.mealPlans[index], ...mealPlan };
+    return this.mealPlans[index];
+  }
+
+  async deleteMealPlan(id: string): Promise<void> {
+    const index = this.mealPlans.findIndex(mp => mp.id === id);
+    if (index !== -1) this.mealPlans.splice(index, 1);
+  }
+
+  async getShoppingListItems(): Promise<ShoppingListItem[]> {
+    return [...this.shoppingItems];
+  }
+
+  async createShoppingListItem(item: InsertShoppingListItem): Promise<ShoppingListItem> {
+    const newItem: ShoppingListItem = {
+      ...item,
+      id: `item_${this.idCounter++}`,
+      createdAt: new Date(),
+    };
+    this.shoppingItems.push(newItem);
+    return newItem;
+  }
+
+  async updateShoppingListItem(id: string, item: Partial<InsertShoppingListItem>): Promise<ShoppingListItem> {
+    const index = this.shoppingItems.findIndex(si => si.id === id);
+    if (index === -1) throw new Error('Shopping item not found');
+    this.shoppingItems[index] = { ...this.shoppingItems[index], ...item };
+    return this.shoppingItems[index];
+  }
+
+  async deleteShoppingListItem(id: string): Promise<void> {
+    const index = this.shoppingItems.findIndex(si => si.id === id);
+    if (index !== -1) this.shoppingItems.splice(index, 1);
+  }
+
+  async generateShoppingListFromMealPlan(startDate: string, endDate: string): Promise<ShoppingListItem[]> {
+    const plans = await this.getMealPlans(startDate, endDate);
+    const results = [];
+    
+    for (const plan of plans) {
+      if (plan.recipeId) {
+        const recipe = await this.getRecipe(plan.recipeId);
+        if (recipe) {
+          for (const ingredient of recipe.ingredients) {
+            const item = await this.createShoppingListItem({
+              name: ingredient,
+              quantity: "1",
+              category: "Other",
+              isCompleted: false,
+              recipeId: recipe.id,
+            });
+            results.push(item);
+          }
+        }
+      }
+    }
+    return results;
+  }
+}
+
+// Using memory storage for immediate functionality - switch to Firebase once permissions are fixed
+export const storage = new MemoryStorage();
