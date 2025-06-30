@@ -138,7 +138,8 @@ export class FirebaseStorage implements IStorage {
     
     // Get recipes for the meal plans
     const recipeIds = mealPlans.map(mp => mp.recipeId).filter(Boolean);
-    const uniqueRecipeIds = [...new Set(recipeIds)];
+    const filteredIds = recipeIds.filter(id => id !== null) as string[];
+    const uniqueRecipeIds = Array.from(new Set(filteredIds));
     
     const recipes = await Promise.all(
       uniqueRecipeIds.map(id => this.getRecipe(id as string))
@@ -170,13 +171,14 @@ export class FirebaseStorage implements IStorage {
     // Create shopping list items
     const shoppingListItems: ShoppingListItem[] = [];
     
-    for (const [name, data] of ingredientMap) {
+    const entries = Array.from(ingredientMap.entries());
+    for (const [name, data] of entries) {
       const item = await this.createShoppingListItem({
         name: data.quantity,
         quantity: '1',
         category: data.category,
         isCompleted: false,
-        recipeId: parseInt(data.recipeIds[0])
+        recipeId: data.recipeIds[0]
       });
       shoppingListItems.push(item);
     }
