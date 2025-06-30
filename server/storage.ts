@@ -34,8 +34,15 @@ export interface IStorage {
 export class FirebaseStorage implements IStorage {
   // Recipe operations
   async getRecipes(): Promise<Recipe[]> {
-    const snapshot = await db.collection(COLLECTIONS.RECIPES).orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recipe));
+    try {
+      console.log('Attempting to fetch recipes from Firestore...');
+      const snapshot = await db.collection(COLLECTIONS.RECIPES).orderBy('createdAt', 'desc').get();
+      console.log(`Successfully fetched ${snapshot.docs.length} recipes`);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recipe));
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
+      throw error;
+    }
   }
 
   async getRecipe(id: string): Promise<Recipe | undefined> {

@@ -9,11 +9,20 @@ if (!getApps().length) {
     privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
   };
 
+  console.log('Firebase config check:', {
+    hasProjectId: !!serviceAccount.projectId,
+    hasClientEmail: !!serviceAccount.clientEmail,
+    hasPrivateKey: !!serviceAccount.privateKey,
+    projectId: serviceAccount.projectId
+  });
+
   if (serviceAccount.privateKey && serviceAccount.clientEmail && serviceAccount.projectId) {
+    console.log('Initializing Firebase with credentials');
     initializeApp({
       credential: cert(serviceAccount),
     });
   } else {
+    console.log('Using Firebase emulator mode');
     // Fallback for development - use emulator
     process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
     initializeApp({
