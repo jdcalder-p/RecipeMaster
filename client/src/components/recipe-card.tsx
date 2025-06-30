@@ -257,20 +257,57 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
                 {DAYS_OF_WEEK.map((day, index) => {
                   const date = format(addDays(currentWeek, index), 'yyyy-MM-dd');
                   const isSelected = selectedDate === date;
+                  const hasScheduledMeal = recipeMealPlans.some(plan => plan.date === date);
+                  const scheduledMeals = recipeMealPlans.filter(plan => plan.date === date);
                   
                   return (
                     <Button
                       key={day}
                       variant={isSelected ? "default" : "outline"}
                       size="sm"
-                      className="h-auto p-2 flex flex-col"
+                      className={`h-auto p-2 flex flex-col relative ${
+                        hasScheduledMeal && !isSelected 
+                          ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' 
+                          : ''
+                      }`}
                       onClick={() => setSelectedDate(date)}
                     >
                       <span className="text-xs">{day.slice(0, 3)}</span>
                       <span className="text-xs">{format(addDays(currentWeek, index), 'd')}</span>
+                      {hasScheduledMeal && (
+                        <div className="absolute -top-1 -right-1 flex">
+                          {scheduledMeals.map((meal, mealIndex) => (
+                            <div
+                              key={meal.id}
+                              className={`h-2 w-2 rounded-full ${
+                                meal.mealType === 'breakfast' ? 'bg-yellow-400' :
+                                meal.mealType === 'lunch' ? 'bg-orange-400' :
+                                'bg-purple-400'
+                              }`}
+                              style={{ marginLeft: mealIndex > 0 ? '-2px' : '0' }}
+                              title={`${meal.mealType.charAt(0).toUpperCase() + meal.mealType.slice(1)}`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </Button>
                   );
                 })}
+              </div>
+              {/* Legend */}
+              <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
+                <div className="flex items-center gap-1">
+                  <div className="h-2 w-2 rounded-full bg-yellow-400"></div>
+                  <span>Breakfast</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="h-2 w-2 rounded-full bg-orange-400"></div>
+                  <span>Lunch</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="h-2 w-2 rounded-full bg-purple-400"></div>
+                  <span>Dinner</span>
+                </div>
               </div>
             </div>
             
