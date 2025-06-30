@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, Star, Heart, ShoppingCart } from "lucide-react";
+import { Clock, Users, Star, Heart, ShoppingCart, Edit, Divide, X } from "lucide-react";
 import { Recipe } from "@shared/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -11,11 +12,25 @@ interface RecipeDetailModalProps {
   recipe: Recipe | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEditRecipe?: (recipe: Recipe) => void;
 }
 
-export function RecipeDetailModal({ recipe, open, onOpenChange }: RecipeDetailModalProps) {
+export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: RecipeDetailModalProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [portionMultiplier, setPortionMultiplier] = useState(1);
+
+  // Helper function to scale ingredient quantities
+  const scaleIngredient = (ingredient: string, multiplier: number): string => {
+    // Extract numbers from ingredient strings using regex
+    const numberPattern = /(\d+\.?\d*|\d*\.?\d+)/g;
+    return ingredient.replace(numberPattern, (match) => {
+      const num = parseFloat(match);
+      const scaled = num * multiplier;
+      // Round to 2 decimal places and remove trailing zeros
+      return (scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(2).replace(/\.?0+$/, ''));
+    });
+  };
 
   const toggleFavoriteMutation = useMutation({
     mutationFn: async () => {
@@ -91,6 +106,13 @@ export function RecipeDetailModal({ recipe, open, onOpenChange }: RecipeDetailMo
             <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
+                onClick={() => onEditRecipe?.(recipe)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
                 onClick={() => toggleFavoriteMutation.mutate()}
                 disabled={toggleFavoriteMutation.isPending}
               >
@@ -142,7 +164,37 @@ export function RecipeDetailModal({ recipe, open, onOpenChange }: RecipeDetailMo
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Ingredients</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Ingredients</h2>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPortionMultiplier(0.5)}
+                    className={portionMultiplier === 0.5 ? "bg-primary text-white" : ""}
+                  >
+                    <Divide className="h-4 w-4 mr-1" />
+                    1/2
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPortionMultiplier(1)}
+                    className={portionMultiplier === 1 ? "bg-primary text-white" : ""}
+                  >
+                    1x
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPortionMultiplier(2)}
+                    className={portionMultiplier === 2 ? "bg-primary text-white" : ""}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    2
+                  </Button>
+                </div>
+              </div>
               <div className="space-y-2">
                 {recipe.ingredients.map((ingredient, index) => (
                   <div key={index} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
@@ -150,7 +202,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange }: RecipeDetailMo
                       type="checkbox"
                       className="rounded border-gray-300 text-primary focus:ring-primary"
                     />
-                    <span className="flex-1">{ingredient}</span>
+                    <span className="flex-1">{scaleIngredient(ingredient, portionMultiplier)}</span>
                   </div>
                 ))}
               </div>
