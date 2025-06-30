@@ -77,12 +77,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
   const updateMutation = useMutation({
     mutationFn: async (data: InsertRecipe) => {
       if (!recipe) throw new Error("No recipe to update");
-      const response = await apiRequest(`/api/recipes/${recipe.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      return response.json();
+      return apiRequest("PATCH", `/api/recipes/${recipe.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
