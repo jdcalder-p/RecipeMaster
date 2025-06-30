@@ -256,6 +256,7 @@ export class RecipeScraper {
     const description = this.extractBySelectors($, selectors.description);
     const ingredients = this.extractListBySelectors($, selectors.ingredients);
     let instructions = this.extractInstructionsBySelectors($, selectors.instructions);
+    console.log(`=== INSTRUCTION EXTRACTION DEBUG ===`);
     console.log(`Found ${instructions.length} instructions using selectors:`, instructions.slice(0, 3));
     
     // If we didn't find many instructions, try broader searches
@@ -439,11 +440,8 @@ export class RecipeScraper {
   }
 
   private static extractInstructionsBySelectors($: cheerio.CheerioAPI, selectors: string[]): string[] {
-    console.log(`Trying ${selectors.length} instruction selectors...`);
     for (const selector of selectors) {
-      console.log(`Trying instruction selector: ${selector}`);
       const elements = $(selector);
-      console.log(`Found ${elements.length} elements with selector: ${selector}`);
       if (elements.length > 0) {
         let instructions = elements.map((_, el) => $(el).text().trim()).get();
         
@@ -463,8 +461,6 @@ export class RecipeScraper {
           !inst.toLowerCase().includes('advertisement') &&
           !inst.toLowerCase().includes('subscribe')
         );
-        
-        console.log(`Filtered to ${filteredInstructions.length} instructions:`, filteredInstructions.slice(0, 2));
         
         if (filteredInstructions.length > 0) {
           return filteredInstructions;
@@ -551,16 +547,20 @@ export class RecipeScraper {
     return '';
   }
 
-  private static parseInstructions(instructions: any[]): string[] {
+  private static parseInstructions(instructions: any[]): { text: string; imageUrl?: string }[] {
     const parsedInstructions = instructions.map(inst => {
-      if (typeof inst === 'string') return inst.trim();
-      if (inst.text) return inst.text.trim();
-      if (inst.name) return inst.name.trim();
-      return '';
+      let text = '';
+      if (typeof inst === 'string') text = inst.trim();
+      else if (inst.text) text = inst.text.trim();
+      else if (inst.name) text = inst.name.trim();
+      
+      return text ? { text } : null;
     }).filter(Boolean);
 
-    // Remove duplicates by converting to Set and back to array
-    const uniqueInstructions = Array.from(new Set(parsedInstructions));
+    // Remove duplicates by converting to Set and back to array based on text
+    const uniqueInstructions = parsedInstructions.filter((inst, index, arr) => 
+      arr.findIndex(other => other.text === inst.text) === index
+    );
     
     return uniqueInstructions;
   }
