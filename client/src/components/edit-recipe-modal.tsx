@@ -155,26 +155,46 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     });
   };
 
-  const addIngredient = () => {
-    const newIngredients = [...ingredients, ""];
-    setIngredients(newIngredients);
-    setTimeout(() => {
-      const lastIndex = newIngredients.length - 1;
-      ingredientRefs.current[lastIndex]?.focus();
-    }, 0);
+  const addIngredientSection = () => {
+    setIngredientSections([...ingredientSections, { items: [{ name: "" }] }]);
   };
 
-  const updateIngredient = (index: number, value: string) => {
-    const newIngredients = [...ingredients];
-    newIngredients[index] = value;
-    setIngredients(newIngredients);
-  };
-
-  const removeIngredient = (index: number) => {
-    if (ingredients.length > 1) {
-      setIngredients(ingredients.filter((_, i) => i !== index));
+  const removeIngredientSection = (sectionIndex: number) => {
+    if (ingredientSections.length > 1) {
+      setIngredientSections(ingredientSections.filter((_, i) => i !== sectionIndex));
     }
   };
+
+  const updateSectionName = (sectionIndex: number, name: string) => {
+    const newSections = [...ingredientSections];
+    newSections[sectionIndex].sectionName = name || undefined;
+    setIngredientSections(newSections);
+  };
+
+  const addIngredientToSection = (sectionIndex: number) => {
+    const newSections = [...ingredientSections];
+    newSections[sectionIndex].items.push({ name: "" });
+    setIngredientSections(newSections);
+  };
+
+  const removeIngredientFromSection = (sectionIndex: number, itemIndex: number) => {
+    const newSections = [...ingredientSections];
+    if (newSections[sectionIndex].items.length > 1) {
+      newSections[sectionIndex].items.splice(itemIndex, 1);
+      setIngredientSections(newSections);
+    }
+  };
+
+  const updateIngredientItem = (sectionIndex: number, itemIndex: number, field: string, value: string) => {
+    const newSections = [...ingredientSections];
+    (newSections[sectionIndex].items[itemIndex] as any)[field] = value;
+    setIngredientSections(newSections);
+  };
+
+  // Sync form values when ingredient sections change
+  useEffect(() => {
+    setValue("ingredients", ingredientSections);
+  }, [ingredientSections, setValue]);
 
   const addInstruction = () => {
     const newInstructions = [...instructions, ""];
@@ -309,37 +329,85 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
 
           <div>
             <Label>Ingredients *</Label>
-            <div className="space-y-2">
-              {ingredients.map((ingredient, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <Input
-                    ref={(el) => { ingredientRefs.current[index] = el; }}
-                    placeholder="e.g., 1 cup flour"
-                    value={ingredient}
-                    onChange={(e) => updateIngredient(index, e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeIngredient(index)}
-                    disabled={ingredients.length === 1}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addIngredientSection}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Section
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {ingredientSections.map((section, sectionIndex) => (
+                <Card key={sectionIndex} className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Input
+                      placeholder="Section name (optional)"
+                      value={section.sectionName || ""}
+                      onChange={(e) => updateSectionName(sectionIndex, e.target.value)}
+                      className="flex-1 mr-2"
+                    />
+                    {ingredientSections.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeIngredientSection(sectionIndex)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2 pl-4 border-l-2 border-gray-200">
+                    {section.items.map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex items-center space-x-2">
+                        <Input
+                          placeholder="Quantity"
+                          value={item.quantity || ""}
+                          onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'quantity', e.target.value)}
+                          className="w-20"
+                        />
+                        <Input
+                          placeholder="Unit"
+                          value={item.unit || ""}
+                          onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'unit', e.target.value)}
+                          className="w-20"
+                        />
+                        <Input
+                          placeholder="Ingredient name"
+                          value={item.name}
+                          onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'name', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeIngredientFromSection(sectionIndex, itemIndex)}
+                          disabled={section.items.length === 1}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => addIngredientToSection(sectionIndex)}
+                      className="mt-2"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Ingredient
+                    </Button>
+                  </div>
+                </Card>
               ))}
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={addIngredient}
-              className="mt-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Ingredient
-            </Button>
           </div>
 
           <div>
