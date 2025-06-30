@@ -3,27 +3,14 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertRecipeSchema, insertMealPlanSchema, insertShoppingListItemSchema } from "@shared/schema";
 import { RecipeScraper } from "./services/scraper";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { verifyFirebaseToken } from "./firebaseAuth";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
-
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  // No setup required for Firebase auth
 
   // Recipe routes
-  app.get("/api/recipes", isAuthenticated, async (req: any, res) => {
+  app.get("/api/recipes", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { search } = req.query;
@@ -42,7 +29,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/recipes/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/recipes/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const recipe = await storage.getRecipe(req.params.id, userId);
@@ -56,7 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/recipes", isAuthenticated, async (req: any, res) => {
+  app.post("/api/recipes", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const recipeData = insertRecipeSchema.parse(req.body);
@@ -71,7 +58,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/recipes/import", isAuthenticated, async (req: any, res) => {
+  app.post("/api/recipes/import", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { url } = req.body;
@@ -100,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/recipes/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/recipes/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const updates = req.body;
@@ -112,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/recipes/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/recipes/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       await storage.deleteRecipe(req.params.id, userId);
@@ -124,7 +111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Meal plan routes
-  app.get("/api/meal-plans", isAuthenticated, async (req: any, res) => {
+  app.get("/api/meal-plans", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { startDate, endDate } = req.query;
@@ -140,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/meal-plans", isAuthenticated, async (req: any, res) => {
+  app.post("/api/meal-plans", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const mealPlanData = insertMealPlanSchema.parse(req.body);
@@ -155,7 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/meal-plans/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/meal-plans/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const updates = req.body;
@@ -167,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/meal-plans/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/meal-plans/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       await storage.deleteMealPlan(req.params.id, userId);
@@ -179,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Shopping list routes
-  app.get("/api/shopping-list", isAuthenticated, async (req: any, res) => {
+  app.get("/api/shopping-list", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const items = await storage.getShoppingListItems(userId);
@@ -190,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/shopping-list", isAuthenticated, async (req: any, res) => {
+  app.post("/api/shopping-list", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const itemData = insertShoppingListItemSchema.parse(req.body);
@@ -205,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/shopping-list/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/shopping-list/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const updates = req.body;
@@ -217,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/shopping-list/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/shopping-list/:id", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       await storage.deleteShoppingListItem(req.params.id, userId);
@@ -228,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/shopping-list/generate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/shopping-list/generate", verifyFirebaseToken, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { startDate, endDate } = req.body;
