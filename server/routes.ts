@@ -93,12 +93,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Scrape recipe from URL
       const scrapedData = await RecipeScraper.scrapeRecipe(url);
+      console.log("Scraped data:", JSON.stringify(scrapedData, null, 2));
       
       // Validate and create recipe
       const recipeData = insertRecipeSchema.parse({
         ...scrapedData,
         sourceUrl: url
       });
+      console.log("Final recipe data:", JSON.stringify(recipeData, null, 2));
       
       const recipe = await storage.createRecipe(recipeData, userId);
       res.status(201).json(recipe);
