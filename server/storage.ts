@@ -239,7 +239,7 @@ export class FirebaseStorage implements IStorage {
   }
 }
 
-// PostgreSQL Storage Implementation
+// PostgreSQL Storage Implementation (simplified)
 export class PostgreSQLStorage implements IStorage {
   private db: ReturnType<typeof drizzle>;
 
@@ -250,126 +250,216 @@ export class PostgreSQLStorage implements IStorage {
 
   // Recipe operations
   async getRecipes(): Promise<Recipe[]> {
-    return await this.db.select().from(recipes).orderBy(desc(recipes.createdAt));
+    try {
+      return await this.db.select().from(recipes);
+    } catch (error) {
+      console.error('PostgreSQL error fetching recipes:', error);
+      return [];
+    }
   }
 
   async getRecipe(id: string): Promise<Recipe | undefined> {
-    const result = await this.db.select().from(recipes).where(eq(recipes.id, id)).limit(1);
-    return result[0];
+    try {
+      const result = await this.db.select().from(recipes).where(eq(recipes.id, id)).limit(1);
+      return result[0];
+    } catch (error) {
+      console.error('PostgreSQL error fetching recipe:', error);
+      return undefined;
+    }
   }
 
   async createRecipe(recipe: InsertRecipe): Promise<Recipe> {
-    const { nanoid } = await import('nanoid');
-    const result = await this.db.insert(recipes).values({
-      ...recipe,
-      id: nanoid(),
-    }).returning();
-    return result[0];
+    try {
+      const { nanoid } = await import('nanoid');
+      const recipeData = {
+        id: nanoid(),
+        title: recipe.title,
+        description: recipe.description || null,
+        cookTime: recipe.cookTime || null,
+        servings: recipe.servings || null,
+        category: recipe.category || null,
+        difficulty: recipe.difficulty || null,
+        rating: recipe.rating || 0,
+        imageUrl: recipe.imageUrl || null,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        sourceUrl: recipe.sourceUrl || null,
+        isFavorite: recipe.isFavorite || false,
+      };
+      const result = await this.db.insert(recipes).values(recipeData).returning();
+      return result[0];
+    } catch (error) {
+      console.error('PostgreSQL error creating recipe:', error);
+      throw new Error('Failed to create recipe');
+    }
   }
 
   async updateRecipe(id: string, recipe: Partial<InsertRecipe>): Promise<Recipe> {
-    const result = await this.db.update(recipes).set(recipe).where(eq(recipes.id, id)).returning();
-    return result[0];
+    try {
+      const result = await this.db.update(recipes).set(recipe).where(eq(recipes.id, id)).returning();
+      return result[0];
+    } catch (error) {
+      console.error('PostgreSQL error updating recipe:', error);
+      throw new Error('Failed to update recipe');
+    }
   }
 
   async deleteRecipe(id: string): Promise<void> {
-    await this.db.delete(recipes).where(eq(recipes.id, id));
+    try {
+      await this.db.delete(recipes).where(eq(recipes.id, id));
+    } catch (error) {
+      console.error('PostgreSQL error deleting recipe:', error);
+      throw new Error('Failed to delete recipe');
+    }
   }
 
   async searchRecipes(query: string): Promise<Recipe[]> {
-    return await this.db.select().from(recipes)
-      .where(ilike(recipes.title, `%${query}%`))
-      .orderBy(desc(recipes.createdAt));
+    try {
+      return await this.db.select().from(recipes)
+        .where(ilike(recipes.title, `%${query}%`));
+    } catch (error) {
+      console.error('PostgreSQL error searching recipes:', error);
+      return [];
+    }
   }
 
   // Meal plan operations
   async getMealPlans(startDate?: string, endDate?: string): Promise<MealPlan[]> {
-    let query = this.db.select().from(mealPlans);
-    
-    const conditions = [];
-    if (startDate) conditions.push(gte(mealPlans.date, startDate));
-    if (endDate) conditions.push(lte(mealPlans.date, endDate));
-    
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+    try {
+      let query = this.db.select().from(mealPlans);
+      
+      const conditions = [];
+      if (startDate) conditions.push(gte(mealPlans.date, startDate));
+      if (endDate) conditions.push(lte(mealPlans.date, endDate));
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      return await query;
+    } catch (error) {
+      console.error('PostgreSQL error fetching meal plans:', error);
+      return [];
     }
-    
-    return await query.orderBy(mealPlans.date);
   }
 
   async createMealPlan(mealPlan: InsertMealPlan): Promise<MealPlan> {
-    const { nanoid } = await import('nanoid');
-    const result = await this.db.insert(mealPlans).values({
-      ...mealPlan,
-      id: nanoid(),
-    }).returning();
-    return result[0];
+    try {
+      const { nanoid } = await import('nanoid');
+      const planData = {
+        id: nanoid(),
+        date: mealPlan.date,
+        mealType: mealPlan.mealType,
+        recipeId: mealPlan.recipeId || null,
+      };
+      const result = await this.db.insert(mealPlans).values(planData).returning();
+      return result[0];
+    } catch (error) {
+      console.error('PostgreSQL error creating meal plan:', error);
+      throw new Error('Failed to create meal plan');
+    }
   }
 
   async updateMealPlan(id: string, mealPlan: Partial<InsertMealPlan>): Promise<MealPlan> {
-    const result = await this.db.update(mealPlans).set(mealPlan).where(eq(mealPlans.id, id)).returning();
-    return result[0];
+    try {
+      const result = await this.db.update(mealPlans).set(mealPlan).where(eq(mealPlans.id, id)).returning();
+      return result[0];
+    } catch (error) {
+      console.error('PostgreSQL error updating meal plan:', error);
+      throw new Error('Failed to update meal plan');
+    }
   }
 
   async deleteMealPlan(id: string): Promise<void> {
-    await this.db.delete(mealPlans).where(eq(mealPlans.id, id));
+    try {
+      await this.db.delete(mealPlans).where(eq(mealPlans.id, id));
+    } catch (error) {
+      console.error('PostgreSQL error deleting meal plan:', error);
+      throw new Error('Failed to delete meal plan');
+    }
   }
 
   // Shopping list operations
   async getShoppingListItems(): Promise<ShoppingListItem[]> {
-    return await this.db.select().from(shoppingListItems).orderBy(shoppingListItems.category);
+    try {
+      return await this.db.select().from(shoppingListItems);
+    } catch (error) {
+      console.error('PostgreSQL error fetching shopping list items:', error);
+      return [];
+    }
   }
 
   async createShoppingListItem(item: InsertShoppingListItem): Promise<ShoppingListItem> {
-    const result = await this.db.insert(shoppingListItems).values({
-      ...item,
-      createdAt: new Date(),
-    }).returning();
-    return result[0];
+    try {
+      const { nanoid } = await import('nanoid');
+      const itemData = {
+        id: nanoid(),
+        name: item.name,
+        quantity: item.quantity || null,
+        category: item.category || null,
+        isCompleted: item.isCompleted || false,
+        recipeId: item.recipeId || null,
+      };
+      const result = await this.db.insert(shoppingListItems).values(itemData).returning();
+      return result[0];
+    } catch (error) {
+      console.error('PostgreSQL error creating shopping list item:', error);
+      throw new Error('Failed to create shopping list item');
+    }
   }
 
   async updateShoppingListItem(id: string, item: Partial<InsertShoppingListItem>): Promise<ShoppingListItem> {
-    const result = await this.db.update(shoppingListItems).set(item).where(eq(shoppingListItems.id, id)).returning();
-    return result[0];
+    try {
+      const result = await this.db.update(shoppingListItems).set(item).where(eq(shoppingListItems.id, id)).returning();
+      return result[0];
+    } catch (error) {
+      console.error('PostgreSQL error updating shopping list item:', error);
+      throw new Error('Failed to update shopping list item');
+    }
   }
 
   async deleteShoppingListItem(id: string): Promise<void> {
-    await this.db.delete(shoppingListItems).where(eq(shoppingListItems.id, id));
+    try {
+      await this.db.delete(shoppingListItems).where(eq(shoppingListItems.id, id));
+    } catch (error) {
+      console.error('PostgreSQL error deleting shopping list item:', error);
+      throw new Error('Failed to delete shopping list item');
+    }
   }
 
   async generateShoppingListFromMealPlan(startDate: string, endDate: string): Promise<ShoppingListItem[]> {
-    // Get meal plans for the date range
-    const mealPlansList = await this.getMealPlans(startDate, endDate);
-    
-    // Get recipes for the meal plans
-    const recipeIds = mealPlansList.map(mp => mp.recipeId).filter(Boolean);
-    if (recipeIds.length === 0) return [];
-    
-    const recipesList = await this.db.select().from(recipes)
-      .where(eq(recipes.id, recipeIds[0] as string)); // Simplified for now
-    
-    // Generate shopping list items from ingredients
-    const shoppingItems: InsertShoppingListItem[] = [];
-    
-    for (const recipe of recipesList) {
-      for (const ingredient of recipe.ingredients) {
-        shoppingItems.push({
-          name: ingredient,
-          quantity: "1",
-          category: this.categorizeIngredient(ingredient),
-          isCompleted: false,
-          recipeId: recipe.id,
-        });
+    try {
+      // Get meal plans for the date range
+      const mealPlansList = await this.getMealPlans(startDate, endDate);
+      
+      // Get recipes for the meal plans
+      const recipeIds = mealPlansList.map(mp => mp.recipeId).filter(Boolean) as string[];
+      if (recipeIds.length === 0) return [];
+      
+      const recipesList = await this.db.select().from(recipes);
+      const filteredRecipes = recipesList.filter(recipe => recipeIds.includes(recipe.id));
+      
+      // Generate shopping list items from ingredients
+      const results = [];
+      
+      for (const recipe of filteredRecipes) {
+        for (const ingredient of recipe.ingredients) {
+          const item = await this.createShoppingListItem({
+            name: ingredient,
+            quantity: "1",
+            category: this.categorizeIngredient(ingredient),
+            isCompleted: false,
+            recipeId: recipe.id,
+          });
+          results.push(item);
+        }
       }
-    }
-    
-    // Insert and return items
-    if (shoppingItems.length > 0) {
-      const results = await this.db.insert(shoppingListItems).values(shoppingItems).returning();
+      
       return results;
+    } catch (error) {
+      console.error('PostgreSQL error generating shopping list:', error);
+      return [];
     }
-    
-    return [];
   }
 
   private categorizeIngredient(ingredient: string): string {
@@ -391,5 +481,5 @@ export class PostgreSQLStorage implements IStorage {
   }
 }
 
-// Use Firebase storage for now (PostgreSQL implementation needs type fixes)
+// Use Firebase storage (PostgreSQL has type issues to resolve)
 export const storage = new FirebaseStorage();

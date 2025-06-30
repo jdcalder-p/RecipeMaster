@@ -18,9 +18,15 @@ if (!getApps().length) {
 
   if (serviceAccount.privateKey && serviceAccount.clientEmail && serviceAccount.projectId) {
     console.log('Initializing Firebase with credentials');
-    initializeApp({
-      credential: cert(serviceAccount),
-    });
+    try {
+      initializeApp({
+        credential: cert(serviceAccount),
+        projectId: serviceAccount.projectId,
+      });
+      console.log('Firebase initialization successful');
+    } catch (error) {
+      console.error('Firebase initialization failed:', error);
+    }
   } else {
     console.log('Using Firebase emulator mode');
     // Fallback for development - use emulator
