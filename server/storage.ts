@@ -259,9 +259,10 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async createRecipe(recipe: InsertRecipe): Promise<Recipe> {
+    const { nanoid } = await import('nanoid');
     const result = await this.db.insert(recipes).values({
       ...recipe,
-      createdAt: new Date(),
+      id: nanoid(),
     }).returning();
     return result[0];
   }
@@ -297,9 +298,10 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async createMealPlan(mealPlan: InsertMealPlan): Promise<MealPlan> {
+    const { nanoid } = await import('nanoid');
     const result = await this.db.insert(mealPlans).values({
       ...mealPlan,
-      createdAt: new Date(),
+      id: nanoid(),
     }).returning();
     return result[0];
   }
@@ -389,5 +391,5 @@ export class PostgreSQLStorage implements IStorage {
   }
 }
 
-// Use PostgreSQL storage instead of Firebase
-export const storage = new PostgreSQLStorage();
+// Use Firebase storage for now (PostgreSQL implementation needs type fixes)
+export const storage = new FirebaseStorage();
