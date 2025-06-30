@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Minus, Trash2, Save } from "lucide-react";
+import { Plus, Minus, Trash2, Save, GripVertical, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertRecipeSchema, InsertRecipe, Recipe } from "@shared/schema";
@@ -14,6 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 
 const formSchema = insertRecipeSchema.extend({
   ingredients: z.array(z.object({
@@ -44,6 +45,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
   const { toast } = useToast();
   const ingredientRefs = useRef<(HTMLInputElement | null)[]>([]);
   const instructionRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
+  const sectionNameRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const {
     register,
