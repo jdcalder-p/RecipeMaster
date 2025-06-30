@@ -84,7 +84,9 @@ export class RecipeScraper {
       description: recipe.description || '',
       cookTime,
       servings,
-      ingredients: ingredients.filter(Boolean),
+      ingredients: ingredients.filter(Boolean).length > 0 
+        ? [{ items: ingredients.filter(Boolean).map(ing => ({ name: ing })) }]
+        : [],
       instructions: instructions.filter(Boolean),
       imageUrl: this.parseImage(recipe.image),
       category: this.parseCategory(recipe.recipeCategory),
@@ -153,7 +155,9 @@ export class RecipeScraper {
       description,
       cookTime,
       servings,
-      ingredients: ingredients.filter(Boolean),
+      ingredients: ingredients.filter(Boolean).length > 0 
+        ? [{ items: ingredients.filter(Boolean).map(ing => ({ name: ing })) }]
+        : [],
       instructions: instructions.filter(Boolean),
       imageUrl,
     };
