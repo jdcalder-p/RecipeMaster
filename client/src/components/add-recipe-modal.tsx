@@ -55,7 +55,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     sectionName?: string;
     items: { name: string; quantity?: string; unit?: string; }[];
   }[]>([{ items: [{ name: "" }] }]);
-  const [instructions, setInstructions] = useState<string[]>([""]);
+  const [instructions, setInstructions] = useState<{text: string; imageUrl?: string}[]>([{text: ""}]);
   const [servingSize, setServingSize] = useState(4);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -79,7 +79,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
       category: "",
       imageUrl: "",
       ingredients: [{ items: [{ name: "" }] }],
-      instructions: [""],
+      instructions: [{ text: "" }],
     },
   });
 
@@ -132,10 +132,10 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   const resetForm = () => {
     reset();
     setIngredientSections([{ items: [{ name: "" }] }]);
-    setInstructions([""]);
+    setInstructions([{text: ""}]);
     setImportUrl("");
     setValue("ingredients", [{ items: [{ name: "" }] }]);
-    setValue("instructions", [""]);
+    setValue("instructions", [{text: ""}]);
   };
 
   const onSubmit = (data: InsertRecipe) => {
