@@ -70,9 +70,22 @@ export class RecipeScraper {
   }
 
   private static parseJsonLdRecipe(recipe: any): Partial<InsertRecipe> {
-    const ingredients = Array.isArray(recipe.recipeIngredient) 
+    let ingredients = Array.isArray(recipe.recipeIngredient) 
       ? recipe.recipeIngredient.map((ing: any) => typeof ing === 'string' ? ing : ing.text || '')
       : [];
+
+    // Handle case where ingredients might be a single string with multiple items
+    if (ingredients.length === 1 && ingredients[0].includes('\n')) {
+      ingredients = ingredients[0].split('\n').map((ing: string) => ing.trim()).filter(Boolean);
+    }
+
+    // Handle case where ingredients are separated by bullet points or dashes
+    ingredients = ingredients.flatMap((ing: string) => {
+      if (ing.includes('•') || ing.includes('–') || ing.includes('-')) {
+        return ing.split(/[•–-]/).map((item: string) => item.trim()).filter(Boolean);
+      }
+      return ing;
+    });
 
     const instructions = this.parseInstructions(recipe.recipeInstructions || []);
     
@@ -177,7 +190,25 @@ export class RecipeScraper {
     for (const selector of selectors) {
       const elements = $(selector);
       if (elements.length) {
-        return elements.map((_, el) => $(el).text().trim()).get();
+        let ingredients = elements.map((_, el) => $(el).text().trim()).get();
+        
+        // Handle case where ingredients might be concatenated in a single element
+        ingredients = ingredients.flatMap((ing: string) => {
+          // Split on common separators used in ingredient lists
+          if (ing.includes('\n')) {
+            return ing.split('\n').map((item: string) => item.trim()).filter(Boolean);
+          }
+          if (ing.includes('•') || ing.includes('–') || ing.includes('- ')) {
+            return ing.split(/[•–]|\s-\s/).map((item: string) => item.trim()).filter(Boolean);
+          }
+          // Split on multiple consecutive spaces or tabs (often used between ingredients)
+          if (ing.includes('  ') || ing.includes('\t')) {
+            return ing.split(/\s{2,}|\t/).map((item: string) => item.trim()).filter(Boolean);
+          }
+          return ing;
+        });
+        
+        return ingredients.filter(Boolean);
       }
     }
     return [];
