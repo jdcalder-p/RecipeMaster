@@ -85,7 +85,7 @@ export class RecipeScraper {
       cookTime,
       servings,
       ingredients: ingredients.filter(Boolean).length > 0 
-        ? [{ items: ingredients.filter(Boolean).map(ing => ({ name: ing })) }]
+        ? [{ items: ingredients.filter(Boolean).map((ing: any) => this.parseIngredientText(ing)) }]
         : [],
       instructions: instructions.filter(Boolean),
       imageUrl: this.parseImage(recipe.image),
@@ -156,7 +156,7 @@ export class RecipeScraper {
       cookTime,
       servings,
       ingredients: ingredients.filter(Boolean).length > 0 
-        ? [{ items: ingredients.filter(Boolean).map(ing => ({ name: ing })) }]
+        ? [{ items: ingredients.filter(Boolean).map((ing: any) => this.parseIngredientText(ing)) }]
         : [],
       instructions: instructions.filter(Boolean),
       imageUrl,
@@ -246,5 +246,50 @@ export class RecipeScraper {
       return category[0];
     }
     return '';
+  }
+
+  private static parseIngredientText(ingredientText: string): { name: string; quantity?: string; unit?: string } {
+    const text = ingredientText.trim();
+    
+    // Common patterns for quantity and unit extraction
+    const patterns = [
+      // "2 cups flour" -> quantity: "2", unit: "cups", name: "flour"
+      /^(\d+(?:\.\d+)?(?:\/\d+)?)\s+(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?)\s+(.+)$/i,
+      // "1/2 cup sugar" -> quantity: "1/2", unit: "cup", name: "sugar"
+      /^(\d+\/\d+)\s+(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?)\s+(.+)$/i,
+      // "2-3 apples" -> quantity: "2-3", unit: "", name: "apples"
+      /^(\d+(?:-\d+)?)\s+(.+)$/,
+      // "A pinch of salt" -> quantity: "A pinch", unit: "", name: "salt"
+      /^(a pinch of|a dash of|a handful of)\s+(.+)$/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        if (pattern.source.includes('cups?|tbsp')) {
+          // Has explicit unit
+          return {
+            quantity: match[1],
+            unit: match[2],
+            name: match[3]
+          };
+        } else if (match[1].includes('pinch') || match[1].includes('dash') || match[1].includes('handful')) {
+          // Descriptive quantity
+          return {
+            quantity: match[1],
+            name: match[2]
+          };
+        } else {
+          // Just number
+          return {
+            quantity: match[1],
+            name: match[2]
+          };
+        }
+      }
+    }
+
+    // If no pattern matches, return as plain ingredient name
+    return { name: text };
   }
 }
