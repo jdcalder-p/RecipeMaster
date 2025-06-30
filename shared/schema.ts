@@ -55,6 +55,7 @@ export const recipes = pgTable("recipes", {
   }[]>().notNull().default([]),
   instructions: jsonb("instructions").$type<string[]>().notNull().default([]),
   sourceUrl: text("source_url"),
+  videoUrl: text("video_url"),
   isFavorite: boolean("is_favorite").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
