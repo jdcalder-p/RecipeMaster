@@ -16,17 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 
-const formSchema = insertRecipeSchema.extend({
-  ingredients: z.array(z.object({
-    sectionName: z.string().optional(),
-    items: z.array(z.object({
-      name: z.string().min(1, "Ingredient name is required"),
-      quantity: z.string().optional(),
-      unit: z.string().optional(),
-    })).min(1, "At least one ingredient is required"),
-  })).min(1, "At least one ingredient section is required"),
-  instructions: z.array(z.string()).min(1, "At least one instruction is required"),
-});
+const formSchema = insertRecipeSchema;
 
 interface EditRecipeModalProps {
   recipe: Recipe | null;
@@ -109,17 +99,48 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
       });
       onOpenChange(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error("Update recipe error:", error);
+      
+      // Extract specific error message from the response
+      let errorMessage = "Failed to update recipe. Please try again.";
+      
+      if (error?.message) {
+        if (error.message.includes("401")) {
+          errorMessage = "You are not authorized to update this recipe.";
+        } else if (error.message.includes("400")) {
+          errorMessage = "Invalid recipe data. Please check all required fields.";
+        } else if (error.message.includes("500")) {
+          errorMessage = "Server error. Please try again later.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to update recipe. Please try again.",
+        title: "Update Failed",
+        description: errorMessage,
         variant: "destructive",
       });
-      console.error("Update recipe error:", error);
     },
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
+    console.log("Form submission data:", data);
+    console.log("Form errors:", errors);
+    console.log("Ingredient sections:", ingredientSections);
+    console.log("Instructions:", instructions);
+    
+    // Check if title is empty (required field)
+    if (!data.title || data.title.trim() === "") {
+      toast({
+        title: "Validation Error",
+        description: "Recipe title is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const filteredSections = ingredientSections
       .map(section => ({
         ...section,
@@ -131,7 +152,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     
     if (filteredSections.length === 0) {
       toast({
-        title: "Error",
+        title: "Validation Error",
         description: "Please add at least one ingredient.",
         variant: "destructive",
       });
@@ -140,12 +161,19 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     
     if (filteredInstructions.length === 0) {
       toast({
-        title: "Error",
+        title: "Validation Error",
         description: "Please add at least one instruction.",
         variant: "destructive",
       });
       return;
     }
+
+    console.log("Submitting recipe update:", {
+      ...data,
+      ingredients: filteredSections,
+      instructions: filteredInstructions,
+      servings: servingSize,
+    });
 
     updateMutation.mutate({
       ...data,
@@ -544,6 +572,18 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
+              
+              {/* Debug info for validation */}
+              {Object.keys(errors).length > 0 && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <h4 className="text-sm font-medium text-red-800">Form Validation Errors:</h4>
+                  <ul className="mt-2 text-sm text-red-700">
+                    {Object.entries(errors).map(([field, error]) => (
+                      <li key={field}>• {field}: {error?.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </form>
           </div>
         </DragDropContext>
