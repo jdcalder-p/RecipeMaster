@@ -330,10 +330,10 @@ export class RecipeScraper {
     
     // Common patterns for quantity and unit extraction
     const patterns = [
-      // "2 cups flour" -> quantity: "2", unit: "cups", name: "flour"
-      /^(\d+(?:\.\d+)?(?:\/\d+)?)\s+(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?)\s+(.+)$/i,
+      // "1/3 c 2% or whole milk" -> quantity: "1/3", unit: "c", name: "2% or whole milk"
+      /^(\d+(?:\.\d+)?(?:\/\d+)?)\s+(c|cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|lb|lbs|pound|pounds|oz|ounce|ounces|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|pint|pints|quart|quarts|gallon|gallons|clove|cloves|piece|pieces|slice|slices|strip|strips|bottle|bottles|can|cans|jar|jars|pkg|package|packages)\s+(.+)$/i,
       // "1/2 cup sugar" -> quantity: "1/2", unit: "cup", name: "sugar"
-      /^(\d+\/\d+)\s+(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?)\s+(.+)$/i,
+      /^(\d+\/\d+)\s+(c|cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|lb|lbs|pound|pounds|oz|ounce|ounces|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|pint|pints|quart|quarts|gallon|gallons|clove|cloves|piece|pieces|slice|slices|strip|strips|bottle|bottles|can|cans|jar|jars|pkg|package|packages)\s+(.+)$/i,
       // "2-3 apples" -> quantity: "2-3", unit: "", name: "apples"
       /^(\d+(?:-\d+)?)\s+(.+)$/,
       // "A pinch of salt" -> quantity: "A pinch", unit: "", name: "salt"
@@ -342,11 +342,14 @@ export class RecipeScraper {
 
     console.log(`Parsing ingredient: "${text}"`);
 
-    for (const pattern of patterns) {
+    for (let i = 0; i < patterns.length; i++) {
+      const pattern = patterns[i];
       const match = text.match(pattern);
       if (match) {
-        console.log(`Pattern matched:`, match);
-        if (pattern.source.includes('cups?|tbsp')) {
+        console.log(`Pattern ${i} matched:`, match);
+        
+        // Check if this is a unit-based pattern (first two patterns)
+        if (i < 2 && match.length >= 4) {
           // Has explicit unit
           const result = {
             quantity: match[1],
@@ -355,7 +358,7 @@ export class RecipeScraper {
           };
           console.log(`Parsed with unit:`, result);
           return result;
-        } else if (match[1].includes('pinch') || match[1].includes('dash') || match[1].includes('handful')) {
+        } else if (match[1] && (match[1].includes('pinch') || match[1].includes('dash') || match[1].includes('handful'))) {
           // Descriptive quantity
           const result = {
             quantity: match[1],
@@ -363,7 +366,7 @@ export class RecipeScraper {
           };
           console.log(`Parsed descriptive:`, result);
           return result;
-        } else {
+        } else if (match.length >= 3) {
           // Just number
           const result = {
             quantity: match[1],
