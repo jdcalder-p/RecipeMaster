@@ -203,6 +203,9 @@ export class RecipeScraper {
         'ul li',
       ],
       instructions: [
+        '.wprm-recipe-instruction-text span',
+        '.wprm-recipe-instruction-text',
+        '.wprm-recipe-instruction',
         '.recipe-instruction',
         '.instructions li',
         '[class*="instruction"]',
