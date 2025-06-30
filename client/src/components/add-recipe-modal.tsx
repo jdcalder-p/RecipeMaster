@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,8 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   const [instructions, setInstructions] = useState<string[]>([""]);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const ingredientRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const instructionRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
 
   const {
     register,
@@ -159,6 +161,11 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     const newIngredients = [...ingredients, ""];
     setIngredients(newIngredients);
     setValue("ingredients", newIngredients);
+    // Focus on the new ingredient field after state update
+    setTimeout(() => {
+      const newIndex = newIngredients.length - 1;
+      ingredientRefs.current[newIndex]?.focus();
+    }, 0);
   };
 
   const removeIngredient = (index: number) => {
@@ -181,6 +188,11 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     const newInstructions = [...instructions, ""];
     setInstructions(newInstructions);
     setValue("instructions", newInstructions);
+    // Focus on the new instruction field after state update
+    setTimeout(() => {
+      const newIndex = newInstructions.length - 1;
+      instructionRefs.current[newIndex]?.focus();
+    }, 0);
   };
 
   const removeInstruction = (index: number) => {

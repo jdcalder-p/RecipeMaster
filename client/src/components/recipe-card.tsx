@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, Star, Heart, Calendar } from "lucide-react";
+import { Clock, Users, Star, Heart, Calendar, Trash2, Archive } from "lucide-react";
 import { Recipe } from "@shared/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -61,6 +61,33 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
       });
     },
   });
+
+  const deleteRecipeMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/recipes/${recipe.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
+      toast({
+        title: "Recipe deleted",
+        description: "Recipe has been permanently deleted",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete recipe",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete "${recipe.title}"? This action cannot be undone.`)) {
+      deleteRecipeMutation.mutate();
+    }
+  };
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -130,6 +157,15 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
             disabled={addToMealPlanMutation.isPending}
           >
             <Calendar className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDelete}
+            disabled={deleteRecipeMutation.isPending}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </CardContent>
