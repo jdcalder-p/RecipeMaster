@@ -100,4 +100,15 @@ Preferred communication style: Simple, everyday language.
 ## Changelog
 
 Changelog:
-- June 30, 2025. Initial setup
+- June 30, 2025: Initial setup
+- June 30, 2025: Migrated from Firebase to PostgreSQL with full user authentication
+- June 30, 2025: Enhanced ingredient system with quantity/units and optional sections
+
+## Recent Changes
+
+### Ingredient System Enhancement (June 30, 2025)
+- Updated database schema to support structured ingredients with quantity and units
+- Added ingredient sections functionality for complex recipes (e.g., "Cake" and "Frosting" sections)
+- Modified Add Recipe Modal to support new ingredient structure with section names
+- Updated storage layer and scraper service to handle new ingredient format
+- Added user authentication with Replit Auth for secure, user-specific data

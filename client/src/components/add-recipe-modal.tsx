@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +63,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
       difficulty: "",
       rating: 0,
       imageUrl: "",
-      ingredients: [],
+      ingredients: [{ items: [{ name: "" }] }],
       instructions: [],
       sourceUrl: "",
       isFavorite: false,
@@ -207,6 +207,11 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     (newSections[sectionIndex].items[itemIndex] as any)[field] = value;
     setIngredientSections(newSections);
   };
+
+  // Sync form values when ingredient sections change
+  useEffect(() => {
+    setValue("ingredients", ingredientSections);
+  }, [ingredientSections, setValue]);
 
   const addInstruction = () => {
     const newInstructions = [...instructions, ""];
