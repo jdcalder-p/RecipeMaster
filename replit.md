@@ -118,3 +118,11 @@ Changelog:
 - Added ingredient sections functionality for complex recipes (e.g., "Cake" and "Frosting" sections)
 - Modified Add Recipe Modal to support new ingredient structure with section names
 - Updated storage layer and scraper service to handle new ingredient format
+
+### Drag-and-Drop Enhancement (June 30, 2025)
+- Implemented comprehensive drag-and-drop functionality using react-beautiful-dnd
+- Added draggable ingredient sections with visual feedback during drag operations
+- Enabled ingredient reordering within sections and moving between different sections
+- Auto-focus functionality on new section name fields for improved user experience
+- Fixed Edit Recipe Modal save button functionality and structural issues
+- Enhanced UX with grip handles, blue highlighting during drag, and prominent X close button
