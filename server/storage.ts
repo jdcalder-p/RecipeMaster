@@ -8,7 +8,9 @@ import {
   MealPlan, 
   InsertMealPlan, 
   ShoppingListItem, 
-  InsertShoppingListItem 
+  InsertShoppingListItem,
+  User,
+  UpsertUser
 } from '@shared/schema';
 import { eq, ilike, gte, lte, and, desc } from 'drizzle-orm';
 
