@@ -16,7 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
 const formSchema = insertRecipeSchema.extend({
-  ingredients: z.array(z.string()).min(1, "At least one ingredient is required"),
+  ingredients: z.array(z.object({
+    sectionName: z.string().optional(),
+    items: z.array(z.object({
+      name: z.string().min(1, "Ingredient name is required"),
+      quantity: z.string().optional(),
+      unit: z.string().optional(),
+    })).min(1, "At least one ingredient is required"),
+  })).min(1, "At least one ingredient section is required"),
   instructions: z.array(z.string()).min(1, "At least one instruction is required"),
 });
 
@@ -27,7 +34,10 @@ interface AddRecipeModalProps {
 
 export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   const [importUrl, setImportUrl] = useState("");
-  const [ingredients, setIngredients] = useState<string[]>([""]);
+  const [ingredientSections, setIngredientSections] = useState<{
+    sectionName?: string;
+    items: { name: string; quantity?: string; unit?: string; }[];
+  }[]>([{ items: [{ name: "" }] }]);
   const [instructions, setInstructions] = useState<string[]>([""]);
   const [servingSize, setServingSize] = useState(4);
   const queryClient = useQueryClient();
@@ -108,20 +118,24 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
 
   const resetForm = () => {
     reset();
-    setIngredients([""]);
+    setIngredientSections([{ items: [{ name: "" }] }]);
     setInstructions([""]);
     setImportUrl("");
     // Sync with form validation
-    setValue("ingredients", [""]);
+    setValue("ingredients", [{ items: [{ name: "" }] }]);
     setValue("instructions", [""]);
   };
 
   const onSubmit = (data: InsertRecipe) => {
-    const filteredIngredients = ingredients.filter(ing => ing.trim() !== "");
+    const filteredSections = ingredientSections.map(section => ({
+      ...section,
+      items: section.items.filter(item => item.name.trim() !== "")
+    })).filter(section => section.items.length > 0);
+    
     const filteredInstructions = instructions.filter(inst => inst.trim() !== "");
     
     // Validate that we have at least one ingredient and instruction
-    if (filteredIngredients.length === 0) {
+    if (filteredSections.length === 0) {
       toast({
         title: "Validation Error",
         description: "Please add at least one ingredient",
@@ -141,7 +155,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     
     createMutation.mutate({
       ...data,
-      ingredients: filteredIngredients,
+      ingredients: filteredSections,
       instructions: filteredInstructions,
     });
   };

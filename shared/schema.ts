@@ -45,7 +45,14 @@ export const recipes = pgTable("recipes", {
   difficulty: text("difficulty"),
   rating: integer("rating").default(0),
   imageUrl: text("image_url"),
-  ingredients: jsonb("ingredients").$type<string[]>().notNull().default([]),
+  ingredients: jsonb("ingredients").$type<{
+    sectionName?: string;
+    items: {
+      name: string;
+      quantity?: string;
+      unit?: string;
+    }[];
+  }[]>().notNull().default([]),
   instructions: jsonb("instructions").$type<string[]>().notNull().default([]),
   sourceUrl: text("source_url"),
   isFavorite: boolean("is_favorite").default(false),
