@@ -218,13 +218,13 @@ export class RecipeScraper {
     return duration;
   }
 
-  private static parseServings(yield_: any): number | undefined {
+  private static parseServings(yield_: any): number {
     if (typeof yield_ === 'number') return yield_;
     if (typeof yield_ === 'string') {
       const match = yield_.match(/\d+/);
-      return match ? parseInt(match[0]) : undefined;
+      return match ? parseInt(match[0]) : 1;
     }
-    return undefined;
+    return 1;
   }
 
   private static parseImage(image: any): string {
