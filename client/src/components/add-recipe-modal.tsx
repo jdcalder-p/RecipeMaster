@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Minus, Trash2, Download, Save } from "lucide-react";
+import { Plus, Minus, Trash2, Download, Save, GripVertical, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertRecipeSchema, InsertRecipe } from "@shared/schema";
@@ -14,6 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 
 const formSchema = insertRecipeSchema.extend({
   ingredients: z.array(z.object({
@@ -44,6 +45,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   const { toast } = useToast();
   const ingredientRefs = useRef<(HTMLInputElement | null)[]>([]);
   const instructionRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
+  const sectionNameRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const {
     register,
@@ -173,7 +175,14 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   };
 
   const addIngredientSection = () => {
+    const newIndex = ingredientSections.length;
     setIngredientSections([...ingredientSections, { items: [{ name: "" }] }]);
+    // Auto-focus on the new section name field
+    setTimeout(() => {
+      if (sectionNameRefs.current[newIndex]) {
+        sectionNameRefs.current[newIndex]?.focus();
+      }
+    }, 100);
   };
 
   const removeIngredientSection = (sectionIndex: number) => {
@@ -240,14 +249,61 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     setValue("instructions", newInstructions);
   };
 
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const { source, destination, type } = result;
+
+    if (type === 'section') {
+      // Reorder sections
+      const newSections = Array.from(ingredientSections);
+      const [removed] = newSections.splice(source.index, 1);
+      newSections.splice(destination.index, 0, removed);
+      setIngredientSections(newSections);
+      setValue("ingredients", newSections);
+    } else if (type === 'ingredient') {
+      // Handle ingredient reordering
+      const sourceSection = parseInt(source.droppableId.split('-')[1]);
+      const destSection = parseInt(destination.droppableId.split('-')[1]);
+      
+      const newSections = [...ingredientSections];
+      const sourceItems = [...newSections[sourceSection].items];
+      const [removed] = sourceItems.splice(source.index, 1);
+      
+      if (sourceSection === destSection) {
+        // Same section reorder
+        sourceItems.splice(destination.index, 0, removed);
+        newSections[sourceSection].items = sourceItems;
+      } else {
+        // Move to different section
+        const destItems = [...newSections[destSection].items];
+        destItems.splice(destination.index, 0, removed);
+        newSections[sourceSection].items = sourceItems;
+        newSections[destSection].items = destItems;
+      }
+      
+      setIngredientSections(newSections);
+      setValue("ingredients", newSections);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <DialogTitle>Add New Recipe</DialogTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="h-6 w-6 p-0 hover:bg-gray-100"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="space-y-6">
           {/* Import from URL Section */}
           <Card>
             <CardContent className="p-4">
@@ -385,43 +441,88 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
                 </Button>
               </div>
               
-              <div className="space-y-4">
-                {ingredientSections.map((section, sectionIndex) => (
-                  <Card key={sectionIndex} className="p-4">
-                    <div className="space-y-3">
-                      {/* Section Name Input */}
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          placeholder="Section name (optional, e.g., 'Cake', 'Frosting')"
-                          value={section.sectionName || ""}
-                          onChange={(e) => updateSectionName(sectionIndex, e.target.value)}
-                          className="flex-1"
-                        />
-                        {ingredientSections.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeIngredientSection(sectionIndex)}
+              <Droppable droppableId="sections" type="section">
+                {(provided) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className="space-y-4"
+                  >
+                    {ingredientSections.map((section, sectionIndex) => (
+                      <Draggable
+                        key={sectionIndex}
+                        draggableId={`section-${sectionIndex}`}
+                        index={sectionIndex}
+                      >
+                        {(provided, snapshot) => (
+                          <Card
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className={`p-4 ${snapshot.isDragging ? 'bg-blue-50 shadow-lg' : ''}`}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                      
-                      {/* Ingredients in this section */}
-                      <div className="space-y-2 pl-4 border-l-2 border-gray-200">
-                        {section.items.map((item, itemIndex) => (
-                          <div key={itemIndex} className="flex items-center space-x-2">
-                            <Input
-                              placeholder="Quantity"
-                              value={item.quantity || ""}
-                              onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'quantity', e.target.value)}
-                              className="w-20"
-                            />
-                            <Input
-                              placeholder="Unit"
-                              value={item.unit || ""}
+                            <div className="space-y-3">
+                              {/* Section Name Input with Drag Handle */}
+                              <div className="flex items-center space-x-2">
+                                <div
+                                  {...provided.dragHandleProps}
+                                  className="cursor-grab hover:bg-gray-100 p-1 rounded"
+                                >
+                                  <GripVertical className="h-4 w-4 text-gray-400" />
+                                </div>
+                                <Input
+                                  ref={(el) => sectionNameRefs.current[sectionIndex] = el}
+                                  placeholder="Section name (optional, e.g., 'Cake', 'Frosting')"
+                                  value={section.sectionName || ""}
+                                  onChange={(e) => updateSectionName(sectionIndex, e.target.value)}
+                                  className="flex-1"
+                                />
+                                {ingredientSections.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeIngredientSection(sectionIndex)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                              
+                              {/* Draggable Ingredients in this section */}
+                              <Droppable droppableId={`section-${sectionIndex}`} type="ingredient">
+                                {(provided) => (
+                                  <div
+                                    {...provided.droppableProps}
+                                    ref={provided.innerRef}
+                                    className="space-y-2 pl-4 border-l-2 border-gray-200"
+                                  >
+                                    {section.items.map((item, itemIndex) => (
+                                      <Draggable
+                                        key={`${sectionIndex}-${itemIndex}`}
+                                        draggableId={`ingredient-${sectionIndex}-${itemIndex}`}
+                                        index={itemIndex}
+                                      >
+                                        {(provided, snapshot) => (
+                                          <div
+                                            ref={provided.innerRef}
+                                            {...provided.draggableProps}
+                                            className={`flex items-center space-x-2 ${snapshot.isDragging ? 'bg-blue-50 shadow-md rounded p-2' : ''}`}
+                                          >
+                                            <div
+                                              {...provided.dragHandleProps}
+                                              className="cursor-grab hover:bg-gray-100 p-1 rounded"
+                                            >
+                                              <GripVertical className="h-3 w-3 text-gray-400" />
+                                            </div>
+                                            <Input
+                                              placeholder="Quantity"
+                                              value={item.quantity || ""}
+                                              onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'quantity', e.target.value)}
+                                              className="w-20"
+                                            />
+                                            <Input
+                                              placeholder="Unit"
+                                              value={item.unit || ""}
                               onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'unit', e.target.value)}
                               className="w-20"
                             />
@@ -527,7 +628,8 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
               </Button>
             </div>
           </form>
-        </div>
+          </div>
+        </DragDropContext>
       </DialogContent>
     </Dialog>
   );
