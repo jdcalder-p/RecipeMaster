@@ -185,6 +185,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
           .filter(item => item.name.trim() !== "")
           .map(item => ({
             ...item,
+            name: item.name.charAt(0).toUpperCase() + item.name.slice(1),
             unit: item.unit ? standardizeUnit(item.unit) : item.unit
           }))
       }))
