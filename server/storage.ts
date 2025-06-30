@@ -1,4 +1,7 @@
 import { db, COLLECTIONS } from './services/firebase';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { Pool } from '@neondatabase/serverless';
+import { recipes, mealPlans, shoppingListItems } from '@shared/schema';
 import { 
   Recipe, 
   InsertRecipe, 
@@ -7,6 +10,7 @@ import {
   ShoppingListItem, 
   InsertShoppingListItem 
 } from '@shared/schema';
+import { eq, ilike, gte, lte, and, desc } from 'drizzle-orm';
 
 export interface IStorage {
   // Recipe operations
@@ -235,4 +239,155 @@ export class FirebaseStorage implements IStorage {
   }
 }
 
-export const storage = new FirebaseStorage();
+// PostgreSQL Storage Implementation
+export class PostgreSQLStorage implements IStorage {
+  private db: ReturnType<typeof drizzle>;
+
+  constructor() {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    this.db = drizzle(pool);
+  }
+
+  // Recipe operations
+  async getRecipes(): Promise<Recipe[]> {
+    return await this.db.select().from(recipes).orderBy(desc(recipes.createdAt));
+  }
+
+  async getRecipe(id: string): Promise<Recipe | undefined> {
+    const result = await this.db.select().from(recipes).where(eq(recipes.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createRecipe(recipe: InsertRecipe): Promise<Recipe> {
+    const result = await this.db.insert(recipes).values({
+      ...recipe,
+      createdAt: new Date(),
+    }).returning();
+    return result[0];
+  }
+
+  async updateRecipe(id: string, recipe: Partial<InsertRecipe>): Promise<Recipe> {
+    const result = await this.db.update(recipes).set(recipe).where(eq(recipes.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteRecipe(id: string): Promise<void> {
+    await this.db.delete(recipes).where(eq(recipes.id, id));
+  }
+
+  async searchRecipes(query: string): Promise<Recipe[]> {
+    return await this.db.select().from(recipes)
+      .where(ilike(recipes.title, `%${query}%`))
+      .orderBy(desc(recipes.createdAt));
+  }
+
+  // Meal plan operations
+  async getMealPlans(startDate?: string, endDate?: string): Promise<MealPlan[]> {
+    let query = this.db.select().from(mealPlans);
+    
+    const conditions = [];
+    if (startDate) conditions.push(gte(mealPlans.date, startDate));
+    if (endDate) conditions.push(lte(mealPlans.date, endDate));
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    return await query.orderBy(mealPlans.date);
+  }
+
+  async createMealPlan(mealPlan: InsertMealPlan): Promise<MealPlan> {
+    const result = await this.db.insert(mealPlans).values({
+      ...mealPlan,
+      createdAt: new Date(),
+    }).returning();
+    return result[0];
+  }
+
+  async updateMealPlan(id: string, mealPlan: Partial<InsertMealPlan>): Promise<MealPlan> {
+    const result = await this.db.update(mealPlans).set(mealPlan).where(eq(mealPlans.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteMealPlan(id: string): Promise<void> {
+    await this.db.delete(mealPlans).where(eq(mealPlans.id, id));
+  }
+
+  // Shopping list operations
+  async getShoppingListItems(): Promise<ShoppingListItem[]> {
+    return await this.db.select().from(shoppingListItems).orderBy(shoppingListItems.category);
+  }
+
+  async createShoppingListItem(item: InsertShoppingListItem): Promise<ShoppingListItem> {
+    const result = await this.db.insert(shoppingListItems).values({
+      ...item,
+      createdAt: new Date(),
+    }).returning();
+    return result[0];
+  }
+
+  async updateShoppingListItem(id: string, item: Partial<InsertShoppingListItem>): Promise<ShoppingListItem> {
+    const result = await this.db.update(shoppingListItems).set(item).where(eq(shoppingListItems.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteShoppingListItem(id: string): Promise<void> {
+    await this.db.delete(shoppingListItems).where(eq(shoppingListItems.id, id));
+  }
+
+  async generateShoppingListFromMealPlan(startDate: string, endDate: string): Promise<ShoppingListItem[]> {
+    // Get meal plans for the date range
+    const mealPlansList = await this.getMealPlans(startDate, endDate);
+    
+    // Get recipes for the meal plans
+    const recipeIds = mealPlansList.map(mp => mp.recipeId).filter(Boolean);
+    if (recipeIds.length === 0) return [];
+    
+    const recipesList = await this.db.select().from(recipes)
+      .where(eq(recipes.id, recipeIds[0] as string)); // Simplified for now
+    
+    // Generate shopping list items from ingredients
+    const shoppingItems: InsertShoppingListItem[] = [];
+    
+    for (const recipe of recipesList) {
+      for (const ingredient of recipe.ingredients) {
+        shoppingItems.push({
+          name: ingredient,
+          quantity: "1",
+          category: this.categorizeIngredient(ingredient),
+          isCompleted: false,
+          recipeId: recipe.id,
+        });
+      }
+    }
+    
+    // Insert and return items
+    if (shoppingItems.length > 0) {
+      const results = await this.db.insert(shoppingListItems).values(shoppingItems).returning();
+      return results;
+    }
+    
+    return [];
+  }
+
+  private categorizeIngredient(ingredient: string): string {
+    const categories = [
+      { name: "Produce", keywords: ["apple", "banana", "lettuce", "tomato", "onion", "carrot", "potato"] },
+      { name: "Dairy", keywords: ["milk", "cheese", "butter", "yogurt", "cream"] },
+      { name: "Meat", keywords: ["chicken", "beef", "pork", "fish", "turkey"] },
+      { name: "Pantry", keywords: ["flour", "sugar", "salt", "pepper", "oil", "rice", "pasta"] },
+    ];
+    
+    const lowerIngredient = ingredient.toLowerCase();
+    for (const category of categories) {
+      if (category.keywords.some(keyword => lowerIngredient.includes(keyword))) {
+        return category.name;
+      }
+    }
+    
+    return "Other";
+  }
+}
+
+// Use PostgreSQL storage instead of Firebase
+export const storage = new PostgreSQLStorage();
