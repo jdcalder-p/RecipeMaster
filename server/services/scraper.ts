@@ -294,33 +294,44 @@ export class RecipeScraper {
       /^(a pinch of|a dash of|a handful of)\s+(.+)$/i,
     ];
 
+    console.log(`Parsing ingredient: "${text}"`);
+
     for (const pattern of patterns) {
       const match = text.match(pattern);
       if (match) {
+        console.log(`Pattern matched:`, match);
         if (pattern.source.includes('cups?|tbsp')) {
           // Has explicit unit
-          return {
+          const result = {
             quantity: match[1],
             unit: match[2],
             name: match[3]
           };
+          console.log(`Parsed with unit:`, result);
+          return result;
         } else if (match[1].includes('pinch') || match[1].includes('dash') || match[1].includes('handful')) {
           // Descriptive quantity
-          return {
+          const result = {
             quantity: match[1],
             name: match[2]
           };
+          console.log(`Parsed descriptive:`, result);
+          return result;
         } else {
           // Just number
-          return {
+          const result = {
             quantity: match[1],
             name: match[2]
           };
+          console.log(`Parsed with quantity:`, result);
+          return result;
         }
       }
     }
 
     // If no pattern matches, return as plain ingredient name
-    return { name: text };
+    const result = { name: text };
+    console.log(`No pattern matched, using plain name:`, result);
+    return result;
   }
 }
