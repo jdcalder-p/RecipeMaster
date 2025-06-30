@@ -21,7 +21,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   const [portionMultiplier, setPortionMultiplier] = useState(1);
 
   // Reset portion multiplier when modal opens
-  useState(() => {
+  useEffect(() => {
     if (open) {
       setPortionMultiplier(1);
     }
