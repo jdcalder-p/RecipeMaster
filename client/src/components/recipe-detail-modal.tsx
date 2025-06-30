@@ -257,7 +257,18 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
                     <span className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium flex-shrink-0 mt-1">
                       {index + 1}
                     </span>
-                    <p className="text-gray-700 leading-relaxed">{instruction}</p>
+                    <div className="flex-1">
+                      <p className="text-gray-700 leading-relaxed mb-2">
+                        {typeof instruction === 'string' ? instruction : instruction.text}
+                      </p>
+                      {typeof instruction === 'object' && instruction.imageUrl && (
+                        <img 
+                          src={instruction.imageUrl} 
+                          alt={`Step ${index + 1}`}
+                          className="rounded-lg max-w-full h-auto mt-2"
+                        />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

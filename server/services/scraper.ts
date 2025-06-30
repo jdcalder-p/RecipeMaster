@@ -313,7 +313,7 @@ export class RecipeScraper {
               return parsed;
             }) }]
           : [],
-      instructions: instructions.filter(Boolean),
+      instructions: instructions.filter(Boolean).map(text => ({ text })),
       imageUrl,
       videoUrl,
     };
