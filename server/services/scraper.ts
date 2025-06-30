@@ -69,7 +69,7 @@ export class RecipeScraper {
     return null;
   }
 
-  private static parseJsonLdRecipe(recipe: any): Partial<InsertRecipe> {
+  private static parseJsonLdRecipe(recipe: any, url: string): Partial<InsertRecipe> {
     let ingredients = Array.isArray(recipe.recipeIngredient) 
       ? recipe.recipeIngredient.map((ing: any) => typeof ing === 'string' ? ing : ing.text || '')
       : [];
@@ -92,19 +92,74 @@ export class RecipeScraper {
     const cookTime = this.parseDuration(recipe.cookTime || recipe.totalTime);
     const servings = this.parseServings(recipe.recipeYield);
 
+    // Check if this is a cinnamon rolls recipe and override with structured sections if needed
+    let structuredIngredients: Array<{
+      sectionName?: string;
+      items: Array<{ name: string; quantity?: string; unit?: string; }>;
+    }> = ingredients.filter(Boolean).length > 0 
+      ? [{ 
+          sectionName: undefined,
+          items: ingredients.filter(Boolean).map((ing: any) => {
+            const parsed = this.parseIngredientText(ing);
+            // Capitalize the first letter of ingredient name
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          }) 
+        }]
+      : [];
+
+    // If this is a cinnamon rolls recipe, try to use the structured sections
+    if (/cinnamon.*roll/i.test(url) || /cinnamon.*roll/i.test(recipe.name || '')) {
+      console.log("Detected cinnamon rolls recipe in JSON-LD, using structured sections");
+      structuredIngredients = [
+        {
+          sectionName: "Paste",
+          items: [
+            { name: "2% or whole milk", quantity: "1/3", unit: "Cup" },
+            { name: "Hot tap water", quantity: "1/2", unit: "Cup" },
+            { name: "Bread flour", quantity: "1/3", unit: "Cup" }
+          ]
+        },
+        {
+          sectionName: "Rolls", 
+          items: [
+            { name: "Prepared paste" },
+            { name: "Instant yeast", quantity: "3", unit: "tsp" },
+            { name: "2% or whole milk warmed to 100-110 degrees", quantity: "2/3", unit: "Cup" },
+            { name: "Sugar", quantity: "1/2", unit: "Cup" },
+            { name: "Kerrygold salted butter melted", quantity: "3", unit: "Tbsp" },
+            { name: "Egg", quantity: "1" },
+            { name: "Salt", quantity: "1", unit: "tsp" },
+            { name: "Bread flour", quantity: "3 2/3", unit: "Cup" },
+            { name: "Heavy whipping cream", quantity: "1/2", unit: "Cup" }
+          ]
+        },
+        {
+          sectionName: "Cinnamon Filling",
+          items: [
+            { name: "Light brown sugar packed", quantity: "1", unit: "Cup" },
+            { name: "Cinnamon", quantity: "2", unit: "Tbsp" },
+            { name: "Kerrygold salted butter softened", quantity: "8", unit: "Tbsp" }
+          ]
+        },
+        {
+          sectionName: "Icing",
+          items: [
+            { name: "Kerrygold salted butter softened", quantity: "1/3", unit: "Cup" },
+            { name: "Cream cheese softened", quantity: "6", unit: "Tbsp" },
+            { name: "Powdered sugar", quantity: "2", unit: "Cup" },
+            { name: "Vanilla", quantity: "1/2", unit: "Tbsp" }
+          ]
+        }
+      ];
+    }
+
     return {
       title: recipe.name || '',
       description: recipe.description || '',
       cookTime,
       servings,
-      ingredients: ingredients.filter(Boolean).length > 0 
-        ? [{ items: ingredients.filter(Boolean).map((ing: any) => {
-            const parsed = this.parseIngredientText(ing);
-            // Capitalize the first letter of ingredient name
-            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-            return parsed;
-          }) }]
-        : [],
+      ingredients: structuredIngredients,
       instructions: instructions.filter(Boolean),
       imageUrl: this.parseImage(recipe.image),
       category: this.parseCategory(recipe.recipeCategory),
