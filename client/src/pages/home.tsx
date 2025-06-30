@@ -172,22 +172,22 @@ export default function Home() {
               
               {/* User Info */}
               <div className="flex items-center space-x-3">
-                {user?.profileImageUrl && (
+                {user?.photoURL && (
                   <img 
-                    src={user.profileImageUrl} 
+                    src={user.photoURL} 
                     alt="Profile" 
                     className="w-8 h-8 rounded-full object-cover"
                   />
                 )}
                 <div className="hidden sm:block text-sm">
                   <p className="text-gray-900 font-medium">
-                    {user?.firstName || user?.email || 'User'}
+                    {user?.displayName || user?.email || 'User'}
                   </p>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => window.location.href = '/api/logout'}
+                  onClick={logout}
                   className="text-gray-600 hover:text-gray-900"
                 >
                   Sign Out
