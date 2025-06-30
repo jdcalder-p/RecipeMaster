@@ -53,7 +53,10 @@ export const recipes = pgTable("recipes", {
       unit?: string;
     }[];
   }[]>().notNull().default([]),
-  instructions: jsonb("instructions").$type<string[]>().notNull().default([]),
+  instructions: jsonb("instructions").$type<{
+    text: string;
+    imageUrl?: string;
+  }[]>().notNull().default([]),
   sourceUrl: text("source_url"),
   videoUrl: text("video_url"),
   isFavorite: boolean("is_favorite").default(false),

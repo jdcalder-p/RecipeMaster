@@ -33,13 +33,22 @@ export class RecipeScraper {
       const $ = cheerio.load(response.data);
       
       // Try JSON-LD structured data first
+      console.log(`🔍 SCRAPING: Starting recipe scrape for: ${url}`);
+      console.log(`📄 SCRAPING: Trying JSON-LD extraction...`);
       const jsonLd = this.extractJsonLd($, url);
       if (jsonLd) {
+        console.log(`✅ SCRAPING: JSON-LD extraction successful, found recipe data`);
+        console.log(`📊 JSON-LD INSTRUCTIONS COUNT:`, jsonLd.instructions?.length || 0);
+        console.log(`📊 JSON-LD FIRST 3 INSTRUCTIONS:`, jsonLd.instructions?.slice(0, 3));
         return jsonLd;
       }
 
       // Fallback to manual extraction
-      return this.extractManually($, url);
+      console.log(`🔧 SCRAPING: JSON-LD failed, falling back to manual extraction...`);
+      const manualData = this.extractManually($, url);
+      console.log(`📊 MANUAL INSTRUCTIONS COUNT:`, manualData.instructions?.length || 0);
+      console.log(`📊 MANUAL FIRST 3 INSTRUCTIONS:`, manualData.instructions?.slice(0, 3));
+      return manualData;
     } catch (error) {
       console.error('Error scraping recipe:', error);
       throw new Error('Failed to extract recipe from URL. Please check the URL and try again.');
@@ -160,7 +169,7 @@ export class RecipeScraper {
       cookTime,
       servings,
       ingredients: structuredIngredients,
-      instructions: instructions.filter(Boolean),
+      instructions: instructions.filter(Boolean).map(text => ({ text })),
       imageUrl: this.parseImage(recipe.image),
       category: this.parseCategory(recipe.recipeCategory),
     };
