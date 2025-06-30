@@ -313,10 +313,84 @@ export class RecipeScraper {
               return parsed;
             }) }]
           : [],
-      instructions: instructions.filter(Boolean).map(text => ({ text })),
+      instructions: RecipeScraper.extractInstructionsWithImages($, instructions, url),
       imageUrl,
       videoUrl,
     };
+  }
+
+  private static extractInstructionsWithImages($: cheerio.CheerioAPI, instructions: string[], baseUrl: string): Array<{ text: string; imageUrl?: string }> {
+    console.log(`Extracting images for ${instructions.length} instructions`);
+    
+    return instructions.filter(Boolean).map((text, index) => {
+      let imageUrl: string | undefined;
+      
+      // Try to find an image associated with this instruction step
+      // Look for images near instruction elements that might correspond to this step
+      const stepNumber = index + 1;
+      
+      // Common patterns for instruction images
+      const imageSelectors = [
+        // Look for images with step numbers in class names or data attributes
+        `.step-${stepNumber} img`,
+        `[data-step="${stepNumber}"] img`,
+        `.instruction-${stepNumber} img`,
+        
+        // Look for images in recipe instruction containers
+        '.wprm-recipe-instruction img',
+        '.recipe-instruction img',
+        '.instructions img',
+        '.method img',
+        '.steps img',
+        '.directions img',
+        
+        // Look for images in recipe content sections
+        '.recipe-content img',
+        '.post-content img',
+        '.entry-content img',
+        '.content img',
+        
+        // Look for images in figure elements
+        'figure img',
+        '.wp-block-image img',
+        '.wp-block-gallery img',
+        
+        // Look for images with cooking-related alt text
+        'img[alt*="step"]',
+        'img[alt*="cooking"]',
+        'img[alt*="recipe"]',
+        'img[alt*="instruction"]',
+      ];
+      
+      // Try to find an image for this specific step
+      for (const selector of imageSelectors) {
+        const images = $(selector);
+        if (images.length > index) {
+          const img = images.eq(index);
+          const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
+          if (src) {
+            imageUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
+            console.log(`Found image for step ${stepNumber}: ${imageUrl}`);
+            break;
+          }
+        }
+      }
+      
+      // If no specific image found, try to find any image in the content
+      if (!imageUrl) {
+        const allImages = $('.recipe-content img, .post-content img, .entry-content img, .content img');
+        if (allImages.length > index) {
+          const img = allImages.eq(index);
+          const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
+          if (src) {
+            imageUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
+            console.log(`Found fallback image for step ${stepNumber}: ${imageUrl}`);
+          }
+        }
+      }
+      
+      return { text, imageUrl };
+    });
   }
 
   private static extractIngredientsWithSections($: cheerio.CheerioAPI, url?: string): Array<{
