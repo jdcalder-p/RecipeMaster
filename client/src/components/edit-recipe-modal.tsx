@@ -66,7 +66,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     sectionName?: string;
     items: { name: string; quantity?: string; unit?: string; }[];
   }[]>([{ items: [{ name: "" }] }]);
-  const [instructions, setInstructions] = useState<string[]>([""]);
+  const [instructions, setInstructions] = useState<{ text: string; imageUrl?: string }[]>([{ text: "" }]);
   const [servingSize, setServingSize] = useState(4);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -117,7 +117,17 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
         setIngredientSections([{ items: [{ name: "" }] }]);
       }
       
-      setInstructions(recipe.instructions || [""]);
+      // Handle both old string format and new object format
+      if (recipe.instructions && recipe.instructions.length > 0) {
+        const formattedInstructions = recipe.instructions.map((instruction: any) => 
+          typeof instruction === 'string' 
+            ? { text: instruction } 
+            : instruction
+        );
+        setInstructions(formattedInstructions);
+      } else {
+        setInstructions([{ text: "" }]);
+      }
       setServingSize(recipe.servings || 4);
       setValue("servings", recipe.servings || 4);
     }
@@ -270,12 +280,12 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
   };
 
   const addInstruction = () => {
-    setInstructions([...instructions, ""]);
+    setInstructions([...instructions, { text: "" }]);
   };
 
-  const updateInstruction = (index: number, value: string) => {
+  const updateInstruction = (index: number, field: 'text' | 'imageUrl', value: string) => {
     const newInstructions = [...instructions];
-    newInstructions[index] = value;
+    newInstructions[index] = { ...newInstructions[index], [field]: value };
     setInstructions(newInstructions);
   };
 
