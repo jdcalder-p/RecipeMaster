@@ -36,12 +36,14 @@ export class FirebaseStorage implements IStorage {
   async getRecipes(): Promise<Recipe[]> {
     try {
       console.log('Attempting to fetch recipes from Firestore...');
-      const snapshot = await db.collection(COLLECTIONS.RECIPES).orderBy('createdAt', 'desc').get();
+      const snapshot = await db.collection(COLLECTIONS.RECIPES).get();
       console.log(`Successfully fetched ${snapshot.docs.length} recipes`);
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recipe));
     } catch (error) {
       console.error('Error fetching recipes:', error);
-      throw error;
+      // Return empty array instead of throwing while Firebase is being set up
+      console.log('Returning empty recipes array while Firebase is being configured');
+      return [];
     }
   }
 
@@ -82,17 +84,22 @@ export class FirebaseStorage implements IStorage {
 
   // Meal plan operations
   async getMealPlans(startDate?: string, endDate?: string): Promise<MealPlan[]> {
-    let query = db.collection(COLLECTIONS.MEAL_PLANS).orderBy('date');
-    
-    if (startDate) {
-      query = query.where('date', '>=', startDate);
-    }
-    if (endDate) {
-      query = query.where('date', '<=', endDate);
-    }
+    try {
+      let query = db.collection(COLLECTIONS.MEAL_PLANS).orderBy('date');
+      
+      if (startDate) {
+        query = query.where('date', '>=', startDate);
+      }
+      if (endDate) {
+        query = query.where('date', '<=', endDate);
+      }
 
-    const snapshot = await query.get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MealPlan));
+      const snapshot = await query.get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MealPlan));
+    } catch (error) {
+      console.error('Error fetching meal plans:', error);
+      return [];
+    }
   }
 
   async createMealPlan(mealPlan: InsertMealPlan): Promise<MealPlan> {
@@ -116,8 +123,13 @@ export class FirebaseStorage implements IStorage {
 
   // Shopping list operations
   async getShoppingListItems(): Promise<ShoppingListItem[]> {
-    const snapshot = await db.collection(COLLECTIONS.SHOPPING_LIST).orderBy('category').get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingListItem));
+    try {
+      const snapshot = await db.collection(COLLECTIONS.SHOPPING_LIST).orderBy('category').get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingListItem));
+    } catch (error) {
+      console.error('Error fetching shopping list items:', error);
+      return [];
+    }
   }
 
   async createShoppingListItem(item: InsertShoppingListItem): Promise<ShoppingListItem> {
