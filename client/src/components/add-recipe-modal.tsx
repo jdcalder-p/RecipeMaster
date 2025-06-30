@@ -150,7 +150,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
         }))
     })).filter(section => section.items.length > 0);
     
-    const filteredInstructions = instructions.filter(inst => inst.trim() !== "");
+    const filteredInstructions = instructions.filter(inst => inst.text.trim() !== "");
     
     if (filteredSections.length === 0) {
       toast({
