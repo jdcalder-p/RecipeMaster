@@ -28,7 +28,8 @@ interface AddRecipeModalProps {
 export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   const [importUrl, setImportUrl] = useState("");
   const [ingredients, setIngredients] = useState<string[]>([""]);
-  const [instructions, setInstructions] = useState<string[]>([""]);
+  const [instructions, setInstructions] = useState<Array<{text: string; imageUrl?: string}>>([{text: ""}]);
+  const [servingSize, setServingSize] = useState(4);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const ingredientRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -47,7 +48,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
       title: "",
       description: "",
       cookTime: "",
-      servings: undefined,
+      servings: servingSize,
       category: "",
       difficulty: "",
       rating: 0,
