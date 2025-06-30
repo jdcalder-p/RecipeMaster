@@ -465,12 +465,17 @@ export class RecipeScraper {
   }
 
   private static parseInstructions(instructions: any[]): string[] {
-    return instructions.map(inst => {
-      if (typeof inst === 'string') return inst;
-      if (inst.text) return inst.text;
-      if (inst.name) return inst.name;
+    const parsedInstructions = instructions.map(inst => {
+      if (typeof inst === 'string') return inst.trim();
+      if (inst.text) return inst.text.trim();
+      if (inst.name) return inst.name.trim();
       return '';
-    });
+    }).filter(Boolean);
+
+    // Remove duplicates by converting to Set and back to array
+    const uniqueInstructions = Array.from(new Set(parsedInstructions));
+    
+    return uniqueInstructions;
   }
 
   private static parseDuration(duration: string): string {
