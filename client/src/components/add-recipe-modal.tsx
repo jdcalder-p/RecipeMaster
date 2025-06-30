@@ -147,10 +147,6 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   };
 
   const onSubmit = (data: InsertRecipe) => {
-    console.log("Form errors:", errors);
-    console.log("Form data:", data);
-    console.log("Instructions state:", instructions);
-    
     const filteredSections = ingredientSections.map(section => ({
       ...section,
       items: section.items
@@ -181,8 +177,6 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
       });
       return;
     }
-
-    console.log("Submitting with filtered instructions:", filteredInstructions);
     
     createMutation.mutate({
       ...data,
