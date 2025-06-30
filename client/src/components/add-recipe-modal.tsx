@@ -41,7 +41,10 @@ const formSchema = insertRecipeSchema.extend({
       unit: z.string().optional(),
     })).min(1, "At least one ingredient is required"),
   })).min(1, "At least one ingredient section is required"),
-  instructions: z.array(z.string()).min(1, "At least one instruction is required"),
+  instructions: z.array(z.object({
+    text: z.string().min(1, "Instruction text is required"),
+    imageUrl: z.string().optional(),
+  })).min(1, "At least one instruction is required"),
 });
 
 interface AddRecipeModalProps {
@@ -234,7 +237,14 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   };
 
   const addInstruction = () => {
-    setInstructions([...instructions, ""]);
+    const newInstructions = [...instructions, { text: "" }];
+    setInstructions(newInstructions);
+    setValue("instructions", newInstructions);
+    // Focus on the new instruction field after state update
+    setTimeout(() => {
+      const newIndex = newInstructions.length - 1;
+      instructionRefs.current[newIndex]?.focus();
+    }, 0);
   };
 
   const removeInstruction = (index: number) => {
@@ -245,9 +255,9 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     }
   };
 
-  const updateInstruction = (index: number, value: string) => {
+  const updateInstruction = (index: number, field: 'text' | 'imageUrl', value: string) => {
     const newInstructions = [...instructions];
-    newInstructions[index] = value;
+    newInstructions[index] = { ...newInstructions[index], [field]: value };
     setInstructions(newInstructions);
     setValue("instructions", newInstructions);
   };
@@ -566,28 +576,50 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
                 <Label>Instructions</Label>
                 <div className="space-y-2">
                   {instructions.map((instruction, index) => (
-                    <div key={index} className="flex items-start space-x-2">
-                      <div className="text-sm font-medium text-gray-500 mt-3 min-w-[2rem]">
-                        {index + 1}.
+                    <div key={index} className="border rounded-lg p-3 space-y-3">
+                      <div className="flex items-start space-x-2">
+                        <div className="text-sm font-medium text-gray-500 mt-3 min-w-[2rem]">
+                          {index + 1}.
+                        </div>
+                        <Textarea
+                          ref={(el) => instructionRefs.current[index] = el}
+                          placeholder="Describe this step..."
+                          value={instruction.text}
+                          onChange={(e) => updateInstruction(index, 'text', e.target.value)}
+                          className="flex-1"
+                          rows={2}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeInstruction(index)}
+                          disabled={instructions.length === 1}
+                          className="mt-2"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Textarea
-                        ref={(el) => instructionRefs.current[index] = el}
-                        placeholder="Describe this step..."
-                        value={instruction}
-                        onChange={(e) => updateInstruction(index, e.target.value)}
-                        className="flex-1"
-                        rows={2}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeInstruction(index)}
-                        disabled={instructions.length === 1}
-                        className="mt-2"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
+                      <div className="ml-8">
+                        <Input
+                          placeholder="Optional photo URL for this step..."
+                          value={instruction.imageUrl || ""}
+                          onChange={(e) => updateInstruction(index, 'imageUrl', e.target.value)}
+                          className="text-sm"
+                        />
+                        {instruction.imageUrl && (
+                          <div className="mt-2">
+                            <img 
+                              src={instruction.imageUrl} 
+                              alt={`Step ${index + 1} preview`}
+                              className="rounded-lg max-w-full h-32 object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                   <Button
