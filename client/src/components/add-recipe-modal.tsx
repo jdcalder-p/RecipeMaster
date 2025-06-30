@@ -108,11 +108,19 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     setIngredients([""]);
     setInstructions([""]);
     setImportUrl("");
+    // Sync with form validation
+    setValue("ingredients", [""]);
+    setValue("instructions", [""]);
   };
 
   const onSubmit = (data: InsertRecipe) => {
+    console.log("Form submission data:", data);
+    console.log("Current form errors:", errors);
     const filteredIngredients = ingredients.filter(ing => ing.trim() !== "");
     const filteredInstructions = instructions.filter(inst => inst.trim() !== "");
+    
+    console.log("Filtered ingredients:", filteredIngredients);
+    console.log("Filtered instructions:", filteredInstructions);
     
     createMutation.mutate({
       ...data,
@@ -134,12 +142,16 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   };
 
   const addIngredient = () => {
-    setIngredients([...ingredients, ""]);
+    const newIngredients = [...ingredients, ""];
+    setIngredients(newIngredients);
+    setValue("ingredients", newIngredients);
   };
 
   const removeIngredient = (index: number) => {
     if (ingredients.length > 1) {
-      setIngredients(ingredients.filter((_, i) => i !== index));
+      const newIngredients = ingredients.filter((_, i) => i !== index);
+      setIngredients(newIngredients);
+      setValue("ingredients", newIngredients);
     }
   };
 
@@ -147,15 +159,21 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     const newIngredients = [...ingredients];
     newIngredients[index] = value;
     setIngredients(newIngredients);
+    // Sync with form validation
+    setValue("ingredients", newIngredients);
   };
 
   const addInstruction = () => {
-    setInstructions([...instructions, ""]);
+    const newInstructions = [...instructions, ""];
+    setInstructions(newInstructions);
+    setValue("instructions", newInstructions);
   };
 
   const removeInstruction = (index: number) => {
     if (instructions.length > 1) {
-      setInstructions(instructions.filter((_, i) => i !== index));
+      const newInstructions = instructions.filter((_, i) => i !== index);
+      setInstructions(newInstructions);
+      setValue("instructions", newInstructions);
     }
   };
 
@@ -163,6 +181,8 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     const newInstructions = [...instructions];
     newInstructions[index] = value;
     setInstructions(newInstructions);
+    // Sync with form validation
+    setValue("instructions", newInstructions);
   };
 
   return (
