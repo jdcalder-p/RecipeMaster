@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Clock, Users, Star, Heart, Calendar, Trash2, Archive } from "lucide-react";
 import { Recipe } from "@shared/schema";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
+import { useMealPlan } from "@/hooks/use-meal-plan";
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -28,6 +29,10 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  
+  // Fetch all meal plans for this recipe
+  const { data: allMealPlans = [] } = useMealPlan();
+  const recipeMealPlans = allMealPlans.filter(plan => plan.recipeId === recipe.id);
 
   const toggleFavoriteMutation = useMutation({
     mutationFn: async () => {
@@ -89,6 +94,29 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
 
   const nextWeek = () => {
     setCurrentWeek(prev => addDays(prev, 7));
+  };
+
+  const deleteMealPlanMutation = useMutation({
+    mutationFn: async (mealPlanId: string) => {
+      return apiRequest("DELETE", `/api/meal-plans/${mealPlanId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/meal-plans'] });
+      toast({
+        title: "Meal removed from plan",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove meal from plan",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRemoveMealPlan = (mealPlanId: string) => {
+    deleteMealPlanMutation.mutate(mealPlanId);
   };
 
   const deleteRecipeMutation = useMutation({
@@ -279,6 +307,41 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
                 Cancel
               </Button>
             </div>
+
+            {/* Existing Meal Plans */}
+            {recipeMealPlans.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-3">Currently Scheduled:</h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {recipeMealPlans
+                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    .map((mealPlan) => (
+                      <div
+                        key={mealPlan.id}
+                        className="flex items-center justify-between bg-gray-50 rounded-lg p-2"
+                      >
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">
+                            {format(new Date(mealPlan.date), 'EEE, MMM d')}
+                          </div>
+                          <div className="text-xs text-gray-600 capitalize">
+                            {mealPlan.mealType}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleRemoveMealPlan(mealPlan.id)}
+                          disabled={deleteMealPlanMutation.isPending}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
