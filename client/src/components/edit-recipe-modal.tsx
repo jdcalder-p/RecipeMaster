@@ -158,7 +158,14 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
   };
 
   const addIngredientSection = () => {
+    const newIndex = ingredientSections.length;
     setIngredientSections([...ingredientSections, { items: [{ name: "" }] }]);
+    // Auto-focus on the new section name field
+    setTimeout(() => {
+      if (sectionNameRefs.current[newIndex]) {
+        sectionNameRefs.current[newIndex]?.focus();
+      }
+    }, 100);
   };
 
   const removeIngredientSection = (sectionIndex: number) => {
@@ -219,16 +226,57 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     }
   };
 
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const { source, destination, type } = result;
+
+    if (type === 'section') {
+      const newSections = Array.from(ingredientSections);
+      const [removed] = newSections.splice(source.index, 1);
+      newSections.splice(destination.index, 0, removed);
+      setIngredientSections(newSections);
+    } else if (type === 'ingredient') {
+      const sourceSection = parseInt(source.droppableId.split('-')[1]);
+      const destSection = parseInt(destination.droppableId.split('-')[1]);
+      
+      const newSections = [...ingredientSections];
+      const sourceItems = [...newSections[sourceSection].items];
+      const [removed] = sourceItems.splice(source.index, 1);
+      
+      if (sourceSection === destSection) {
+        sourceItems.splice(destination.index, 0, removed);
+        newSections[sourceSection].items = sourceItems;
+      } else {
+        const destItems = [...newSections[destSection].items];
+        destItems.splice(destination.index, 0, removed);
+        newSections[sourceSection].items = sourceItems;
+        newSections[destSection].items = destItems;
+      }
+      
+      setIngredientSections(newSections);
+    }
+  };
+
   if (!recipe) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <DialogTitle>Edit Recipe</DialogTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="h-6 w-6 p-0 hover:bg-gray-100"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <DragDropContext onDragEnd={onDragEnd}>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Label htmlFor="title">Recipe Title *</Label>
@@ -342,74 +390,131 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
                 Add Section
               </Button>
             </div>
-            <div className="space-y-4">
-              {ingredientSections.map((section, sectionIndex) => (
-                <Card key={sectionIndex} className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <Input
-                      placeholder="Section name (optional)"
-                      value={section.sectionName || ""}
-                      onChange={(e) => updateSectionName(sectionIndex, e.target.value)}
-                      className="flex-1 mr-2"
-                    />
-                    {ingredientSections.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeIngredientSection(sectionIndex)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2 pl-4 border-l-2 border-gray-200">
-                    {section.items.map((item, itemIndex) => (
-                      <div key={itemIndex} className="flex items-center space-x-2">
-                        <Input
-                          placeholder="Quantity"
-                          value={item.quantity || ""}
-                          onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'quantity', e.target.value)}
-                          className="w-20"
-                        />
-                        <Input
-                          placeholder="Unit"
-                          value={item.unit || ""}
-                          onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'unit', e.target.value)}
-                          className="w-20"
-                        />
-                        <Input
-                          placeholder="Ingredient name"
-                          value={item.name}
-                          onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'name', e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeIngredientFromSection(sectionIndex, itemIndex)}
-                          disabled={section.items.length === 1}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => addIngredientToSection(sectionIndex)}
-                      className="mt-2"
+            <Droppable droppableId="sections" type="section">
+              {(provided) => (
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                  className="space-y-4"
+                >
+                  {ingredientSections.map((section, sectionIndex) => (
+                    <Draggable
+                      key={sectionIndex}
+                      draggableId={`section-${sectionIndex}`}
+                      index={sectionIndex}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Ingredient
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                      {(provided, snapshot) => (
+                        <Card
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          className={`p-4 ${snapshot.isDragging ? 'bg-blue-50 shadow-lg' : ''}`}
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-center space-x-2">
+                              <div
+                                {...provided.dragHandleProps}
+                                className="cursor-grab hover:bg-gray-100 p-1 rounded"
+                              >
+                                <GripVertical className="h-4 w-4 text-gray-400" />
+                              </div>
+                              <Input
+                                ref={(el) => sectionNameRefs.current[sectionIndex] = el}
+                                placeholder="Section name (optional, e.g., 'Cake', 'Frosting')"
+                                value={section.sectionName || ""}
+                                onChange={(e) => updateSectionName(sectionIndex, e.target.value)}
+                                className="flex-1"
+                              />
+                              {ingredientSections.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeIngredientSection(sectionIndex)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            
+                            <Droppable droppableId={`section-${sectionIndex}`} type="ingredient">
+                              {(provided) => (
+                                <div
+                                  {...provided.droppableProps}
+                                  ref={provided.innerRef}
+                                  className="space-y-2 pl-4 border-l-2 border-gray-200"
+                                >
+                                  {section.items.map((item, itemIndex) => (
+                                    <Draggable
+                                      key={`${sectionIndex}-${itemIndex}`}
+                                      draggableId={`ingredient-${sectionIndex}-${itemIndex}`}
+                                      index={itemIndex}
+                                    >
+                                      {(provided, snapshot) => (
+                                        <div
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          className={`flex items-center space-x-2 ${snapshot.isDragging ? 'bg-blue-50 shadow-md rounded p-2' : ''}`}
+                                        >
+                                          <div
+                                            {...provided.dragHandleProps}
+                                            className="cursor-grab hover:bg-gray-100 p-1 rounded"
+                                          >
+                                            <GripVertical className="h-3 w-3 text-gray-400" />
+                                          </div>
+                                          <Input
+                                            placeholder="Quantity"
+                                            value={item.quantity || ""}
+                                            onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'quantity', e.target.value)}
+                                            className="w-20"
+                                          />
+                                          <Input
+                                            placeholder="Unit"
+                                            value={item.unit || ""}
+                                            onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'unit', e.target.value)}
+                                            className="w-20"
+                                          />
+                                          <Input
+                                            placeholder="Ingredient name"
+                                            value={item.name}
+                                            onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'name', e.target.value)}
+                                            className="flex-1"
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => removeIngredientFromSection(sectionIndex, itemIndex)}
+                                            disabled={section.items.length === 1}
+                                          >
+                                            <Minus className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  ))}
+                                  {provided.placeholder}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => addIngredientToSection(sectionIndex)}
+                                    className="mt-2"
+                                  >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Ingredient
+                                  </Button>
+                                </div>
+                              )}
+                            </Droppable>
+                          </div>
+                        </Card>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
           </div>
 
           <div>
@@ -473,6 +578,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
             </Button>
           </div>
         </form>
+        </DragDropContext>
       </DialogContent>
     </Dialog>
   );
