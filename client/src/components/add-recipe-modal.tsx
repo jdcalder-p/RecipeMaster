@@ -114,13 +114,27 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   };
 
   const onSubmit = (data: InsertRecipe) => {
-    console.log("Form submission data:", data);
-    console.log("Current form errors:", errors);
     const filteredIngredients = ingredients.filter(ing => ing.trim() !== "");
     const filteredInstructions = instructions.filter(inst => inst.trim() !== "");
     
-    console.log("Filtered ingredients:", filteredIngredients);
-    console.log("Filtered instructions:", filteredInstructions);
+    // Validate that we have at least one ingredient and instruction
+    if (filteredIngredients.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one ingredient",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (filteredInstructions.length === 0) {
+      toast({
+        title: "Validation Error", 
+        description: "Please add at least one instruction",
+        variant: "destructive",
+      });
+      return;
+    }
     
     createMutation.mutate({
       ...data,
