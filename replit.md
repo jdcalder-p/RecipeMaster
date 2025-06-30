@@ -106,9 +106,15 @@ Changelog:
 
 ## Recent Changes
 
+### Firebase Authentication Migration (June 30, 2025)
+- Migrated from Replit Auth/PostgreSQL to Firebase Authentication
+- Updated to email/password authentication instead of Google OAuth
+- Added automatic user creation in database when users authenticate
+- Fixed authentication token handling for all API requests
+- Updated landing page with email/password sign in/up forms
+
 ### Ingredient System Enhancement (June 30, 2025)
 - Updated database schema to support structured ingredients with quantity and units
 - Added ingredient sections functionality for complex recipes (e.g., "Cake" and "Frosting" sections)
 - Modified Add Recipe Modal to support new ingredient structure with section names
 - Updated storage layer and scraper service to handle new ingredient format
-- Added user authentication with Replit Auth for secure, user-specific data
