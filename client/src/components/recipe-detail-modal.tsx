@@ -28,15 +28,23 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   }, [open]);
 
   // Helper function to scale ingredient quantities
-  const scaleIngredient = (ingredient: string, multiplier: number): string => {
-    // Extract numbers from ingredient strings using regex
+  const scaleIngredientItem = (item: { name: string; quantity?: string; unit?: string }, multiplier: number): string => {
+    const { name, quantity, unit } = item;
+    
+    if (!quantity) {
+      return name;
+    }
+
+    // Extract numbers from quantity using regex
     const numberPattern = /(\d+\.?\d*|\d*\.?\d+)/g;
-    return ingredient.replace(numberPattern, (match) => {
+    const scaledQuantity = quantity.replace(numberPattern, (match) => {
       const num = parseFloat(match);
       const scaled = num * multiplier;
       // Round to 2 decimal places and remove trailing zeros
       return (scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(2).replace(/\.?0+$/, ''));
     });
+
+    return `${scaledQuantity}${unit ? ' ' + unit : ''} ${name}`;
   };
 
   const toggleFavoriteMutation = useMutation({
@@ -202,16 +210,39 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
                   </Button>
                 </div>
               </div>
-              <div className="space-y-2">
-                {recipe.ingredients.map((ingredient, index) => (
-                  <div key={index} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                    <input
-                      type="checkbox"
-                      className="rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <span className="flex-1">{scaleIngredient(ingredient, portionMultiplier)}</span>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                {Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0 && (
+                  typeof recipe.ingredients[0] === 'string' 
+                    ? // Legacy format: array of strings
+                      recipe.ingredients.map((ingredient, index) => (
+                        <div key={index} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <span className="flex-1">{ingredient}</span>
+                        </div>
+                      ))
+                    : // New format: array of sections with items
+                      recipe.ingredients.map((section, sectionIndex) => (
+                        <div key={sectionIndex}>
+                          {section.sectionName && (
+                            <h4 className="font-semibold text-gray-800 mb-2">{section.sectionName}</h4>
+                          )}
+                          <div className="space-y-2">
+                            {section.items.map((item, itemIndex) => (
+                              <div key={itemIndex} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <span className="flex-1">{scaleIngredientItem(item, portionMultiplier)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                )}
               </div>
               {recipe.ingredients.length === 0 && (
                 <p className="text-gray-500 text-sm">No ingredients listed</p>
