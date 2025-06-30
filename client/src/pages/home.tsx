@@ -11,6 +11,7 @@ import { MealPlanning } from "@/components/meal-planning";
 import { ShoppingList } from "@/components/shopping-list";
 import { useRecipes } from "@/hooks/use-recipes";
 import { useShoppingList } from "@/hooks/use-shopping-list";
+import { useAuth } from "@/hooks/useAuth";
 import { Recipe } from "@shared/schema";
 
 type Tab = "recipes" | "meal-planning" | "shopping";
