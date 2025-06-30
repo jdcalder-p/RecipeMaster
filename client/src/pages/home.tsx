@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Utensils, Search, ShoppingCart, Plus, Calendar, ChefHat } from "lucide-react";
 import { RecipeCard } from "@/components/recipe-card";
 import { AddRecipeModal } from "@/components/add-recipe-modal";
+import { EditRecipeModal } from "@/components/edit-recipe-modal";
 import { RecipeDetailModal } from "@/components/recipe-detail-modal";
 import { MealPlanning } from "@/components/meal-planning";
 import { ShoppingList } from "@/components/shopping-list";
@@ -19,7 +20,9 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   const { data: recipes = [], isLoading } = useRecipes(searchQuery);
@@ -39,6 +42,12 @@ export default function Home() {
   const handleViewRecipe = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setShowDetailModal(true);
+  };
+
+  const handleEditRecipe = (recipe: Recipe) => {
+    setEditingRecipe(recipe);
+    setShowEditModal(true);
+    setShowDetailModal(false);
   };
 
   const renderTabContent = () => {
@@ -206,6 +215,13 @@ export default function Home() {
         recipe={selectedRecipe}
         open={showDetailModal}
         onOpenChange={setShowDetailModal}
+        onEditRecipe={handleEditRecipe}
+      />
+
+      <EditRecipeModal
+        recipe={editingRecipe}
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
       />
 
       {/* Floating Action Button for Mobile */}

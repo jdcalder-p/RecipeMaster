@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,13 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [portionMultiplier, setPortionMultiplier] = useState(1);
+
+  // Reset portion multiplier when modal opens
+  useState(() => {
+    if (open) {
+      setPortionMultiplier(1);
+    }
+  }, [open]);
 
   // Helper function to scale ingredient quantities
   const scaleIngredient = (ingredient: string, multiplier: number): string => {
