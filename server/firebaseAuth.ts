@@ -40,6 +40,24 @@ export const verifyFirebaseToken: RequestHandler = async (req, res, next) => {
       picture: decodedToken.picture,
     };
 
+    // Ensure user exists in database
+    try {
+      const { storage } = await import("./storage");
+      let user = await storage.getUser(decodedToken.uid);
+      
+      if (!user) {
+        await storage.upsertUser({
+          id: decodedToken.uid,
+          email: decodedToken.email || null,
+          firstName: decodedToken.name?.split(' ')[0] || null,
+          lastName: decodedToken.name?.split(' ')[1] || null,
+          profileImageUrl: decodedToken.picture || null,
+        });
+      }
+    } catch (error) {
+      console.error("Error ensuring user exists:", error);
+    }
+
     next();
   } catch (error) {
     console.error('Error verifying Firebase token:', error);
