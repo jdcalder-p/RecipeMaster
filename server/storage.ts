@@ -48,18 +48,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
+    try {
+      const [user] = await db
+        .insert(users)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            profileImageUrl: userData.profileImageUrl,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      return user;
+    } catch (error: any) {
+      // If there's still a conflict (e.g., email already exists with different ID), try to get the existing user by ID
+      if (error.code === '23505') {
+        const existingUser = await this.getUser(userData.id);
+        if (existingUser) {
+          return existingUser;
+        }
+        // If email conflict but no user found by ID, we need to handle this differently
+        throw new Error(`User with email ${userData.email} already exists with different ID`);
+      }
+      throw error;
+    }
   }
 
   // Recipe operations
