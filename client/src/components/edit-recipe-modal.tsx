@@ -43,8 +43,6 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
   const [servingSize, setServingSize] = useState(4);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const ingredientRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const instructionRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const sectionNameRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const {
@@ -200,18 +198,8 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     setIngredientSections(newSections);
   };
 
-  // Sync form values when ingredient sections change
-  useEffect(() => {
-    setValue("ingredients", ingredientSections);
-  }, [ingredientSections, setValue]);
-
   const addInstruction = () => {
-    const newInstructions = [...instructions, ""];
-    setInstructions(newInstructions);
-    setTimeout(() => {
-      const lastIndex = newInstructions.length - 1;
-      instructionRefs.current[lastIndex]?.focus();
-    }, 0);
+    setInstructions([...instructions, ""]);
   };
 
   const updateInstruction = (index: number, value: string) => {
@@ -231,30 +219,33 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
 
     const { source, destination, type } = result;
 
-    if (type === 'section') {
+    if (type === "section") {
+      // Reorder sections
       const newSections = Array.from(ingredientSections);
-      const [removed] = newSections.splice(source.index, 1);
-      newSections.splice(destination.index, 0, removed);
+      const [reorderedSection] = newSections.splice(source.index, 1);
+      newSections.splice(destination.index, 0, reorderedSection);
       setIngredientSections(newSections);
-    } else if (type === 'ingredient') {
-      const sourceSection = parseInt(source.droppableId.split('-')[1]);
-      const destSection = parseInt(destination.droppableId.split('-')[1]);
+    } else if (type === "ingredient") {
+      // Handle ingredient reordering within and between sections
+      const sourceDroppableId = source.droppableId;
+      const destDroppableId = destination.droppableId;
       
-      const newSections = [...ingredientSections];
-      const sourceItems = [...newSections[sourceSection].items];
-      const [removed] = sourceItems.splice(source.index, 1);
-      
-      if (sourceSection === destSection) {
-        sourceItems.splice(destination.index, 0, removed);
-        newSections[sourceSection].items = sourceItems;
+      if (sourceDroppableId === destDroppableId) {
+        // Same section
+        const sectionIndex = parseInt(sourceDroppableId.split('-')[1]);
+        const newSections = [...ingredientSections];
+        const [reorderedItem] = newSections[sectionIndex].items.splice(source.index, 1);
+        newSections[sectionIndex].items.splice(destination.index, 0, reorderedItem);
+        setIngredientSections(newSections);
       } else {
-        const destItems = [...newSections[destSection].items];
-        destItems.splice(destination.index, 0, removed);
-        newSections[sourceSection].items = sourceItems;
-        newSections[destSection].items = destItems;
+        // Different sections
+        const sourceSectionIndex = parseInt(sourceDroppableId.split('-')[1]);
+        const destSectionIndex = parseInt(destDroppableId.split('-')[1]);
+        const newSections = [...ingredientSections];
+        const [movedItem] = newSections[sourceSectionIndex].items.splice(source.index, 1);
+        newSections[destSectionIndex].items.splice(destination.index, 0, movedItem);
+        setIngredientSections(newSections);
       }
-      
-      setIngredientSections(newSections);
     }
   };
 
@@ -263,321 +254,298 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <DialogHeader>
           <DialogTitle>Edit Recipe</DialogTitle>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onOpenChange(false)}
-            className="h-6 w-6 p-0 hover:bg-gray-100"
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
           >
             <X className="h-4 w-4" />
           </Button>
         </DialogHeader>
 
         <DragDropContext onDragEnd={onDragEnd}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <Label htmlFor="title">Recipe Title *</Label>
-              <Input
-                id="title"
-                {...register("title")}
-                placeholder="Enter recipe title..."
-              />
-              {errors.title && (
-                <p className="text-sm text-red-500 mt-1">{errors.title.message}</p>
-              )}
-            </div>
+          <div className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <Label htmlFor="title">Recipe Title *</Label>
+                  <Input
+                    id="title"
+                    {...register("title")}
+                    placeholder="Enter recipe title..."
+                  />
+                  {errors.title && (
+                    <p className="text-sm text-red-600 mt-1">{errors.title.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="cookTime">Cook Time</Label>
+                  <Input
+                    id="cookTime"
+                    {...register("cookTime")}
+                    placeholder="e.g., 30 minutes"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="servings">Servings</Label>
+                  <Input
+                    id="servings"
+                    type="number"
+                    value={servingSize}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 1;
+                      setServingSize(value);
+                      setValue("servings", value);
+                    }}
+                    min="1"
+                    max="50"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="difficulty">Difficulty</Label>
+                  <Select onValueChange={(value) => setValue("difficulty", value)} defaultValue={recipe.difficulty || ""}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Easy">Easy</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="Hard">Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select onValueChange={(value) => setValue("category", value)} defaultValue={recipe.category || ""}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Breakfast">Breakfast</SelectItem>
+                      <SelectItem value="Lunch">Lunch</SelectItem>
+                      <SelectItem value="Dinner">Dinner</SelectItem>
+                      <SelectItem value="Dessert">Dessert</SelectItem>
+                      <SelectItem value="Snacks">Snacks</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-            <div>
-              <Label htmlFor="imageUrl">Image URL</Label>
-              <Input
-                id="imageUrl"
-                {...register("imageUrl")}
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
-            <div>
-              <Label htmlFor="sourceUrl">Source URL</Label>
-              <Input
-                id="sourceUrl"
-                {...register("sourceUrl")}
-                placeholder="https://example.com/recipe"
-              />
-            </div>
-            <div>
-              <Label htmlFor="cookTime">Cook Time</Label>
-              <Input
-                id="cookTime"
-                {...register("cookTime")}
-                placeholder="e.g., 30 min"
-              />
-            </div>
-            <div>
-              <Label htmlFor="servings">Servings</Label>
-              <div className="flex items-center space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const newSize = Math.max(1, servingSize - 1);
-                    setServingSize(newSize);
-                    setValue("servings", newSize);
-                  }}
-                  className="h-8 w-8 p-0"
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <span className="min-w-[2rem] text-center font-medium">{servingSize}</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const newSize = servingSize + 1;
-                    setServingSize(newSize);
-                    setValue("servings", newSize);
-                  }}
-                  className="h-8 w-8 p-0"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-                <Input
-                  type="hidden"
-                  {...register("servings", { valueAsNumber: true, value: servingSize })}
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  {...register("description")}
+                  placeholder="Brief description of the recipe..."
+                  rows={3}
                 />
               </div>
-            </div>
-            <div>
-              <Label htmlFor="category">Category</Label>
-              <Select onValueChange={(value) => setValue("category", value)} defaultValue={recipe.category || ""}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Breakfast">Breakfast</SelectItem>
-                  <SelectItem value="Lunch">Lunch</SelectItem>
-                  <SelectItem value="Dinner">Dinner</SelectItem>
-                  <SelectItem value="Dessert">Dessert</SelectItem>
-                  <SelectItem value="Snacks">Snacks</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              {...register("description")}
-              placeholder="Brief description of the recipe..."
-              rows={3}
-            />
-          </div>
-
-          <div>
-            <Label>Ingredients *</Label>
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addIngredientSection}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Section
-              </Button>
-            </div>
-            <Droppable droppableId="sections" type="section">
-              {(provided) => (
-                <div
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                  className="space-y-4"
-                >
-                  {ingredientSections.map((section, sectionIndex) => (
-                    <Draggable
-                      key={sectionIndex}
-                      draggableId={`section-${sectionIndex}`}
-                      index={sectionIndex}
-                    >
-                      {(provided, snapshot) => (
-                        <Card
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className={`p-4 ${snapshot.isDragging ? 'bg-blue-50 shadow-lg' : ''}`}
-                        >
-                          <div className="space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <div
-                                {...provided.dragHandleProps}
-                                className="cursor-grab hover:bg-gray-100 p-1 rounded"
-                              >
-                                <GripVertical className="h-4 w-4 text-gray-400" />
-                              </div>
-                              <Input
-                                ref={(el) => sectionNameRefs.current[sectionIndex] = el}
-                                placeholder="Section name (optional, e.g., 'Cake', 'Frosting')"
-                                value={section.sectionName || ""}
-                                onChange={(e) => updateSectionName(sectionIndex, e.target.value)}
-                                className="flex-1"
-                              />
-                              {ingredientSections.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => removeIngredientSection(sectionIndex)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                            
-                            <Droppable droppableId={`section-${sectionIndex}`} type="ingredient">
-                              {(provided) => (
-                                <div
-                                  {...provided.droppableProps}
-                                  ref={provided.innerRef}
-                                  className="space-y-2 pl-4 border-l-2 border-gray-200"
-                                >
-                                  {section.items.map((item, itemIndex) => (
-                                    <Draggable
-                                      key={`${sectionIndex}-${itemIndex}`}
-                                      draggableId={`ingredient-${sectionIndex}-${itemIndex}`}
-                                      index={itemIndex}
-                                    >
-                                      {(provided, snapshot) => (
-                                        <div
-                                          ref={provided.innerRef}
-                                          {...provided.draggableProps}
-                                          className={`flex items-center space-x-2 ${snapshot.isDragging ? 'bg-blue-50 shadow-md rounded p-2' : ''}`}
-                                        >
-                                          <div
-                                            {...provided.dragHandleProps}
-                                            className="cursor-grab hover:bg-gray-100 p-1 rounded"
-                                          >
-                                            <GripVertical className="h-3 w-3 text-gray-400" />
-                                          </div>
-                                          <Input
-                                            placeholder="Quantity"
-                                            value={item.quantity || ""}
-                                            onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'quantity', e.target.value)}
-                                            className="w-20"
-                                          />
-                                          <Input
-                                            placeholder="Unit"
-                                            value={item.unit || ""}
-                                            onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'unit', e.target.value)}
-                                            className="w-20"
-                                          />
-                                          <Input
-                                            placeholder="Ingredient name"
-                                            value={item.name}
-                                            onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'name', e.target.value)}
-                                            className="flex-1"
-                                          />
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => removeIngredientFromSection(sectionIndex, itemIndex)}
-                                            disabled={section.items.length === 1}
-                                          >
-                                            <Minus className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </Draggable>
-                                  ))}
-                                  {provided.placeholder}
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => addIngredientToSection(sectionIndex)}
-                                    className="mt-2"
-                                  >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Add Ingredient
-                                  </Button>
-                                </div>
-                              )}
-                            </Droppable>
-                          </div>
-                        </Card>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+              <div>
+                <Label>Ingredients *</Label>
+                <div className="flex items-center justify-between mb-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addIngredientSection}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Section
+                  </Button>
                 </div>
-              )}
-            </Droppable>
-          </div>
-
-          <div>
-            <Label>Instructions *</Label>
-            <div className="space-y-2">
-              {instructions.map((instruction, index) => (
-                <Card key={index} className="p-3">
-                  <div className="space-y-3">
-                    <div className="flex items-start space-x-2">
-                      <span className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mt-1 flex-shrink-0">
-                        {index + 1}
-                      </span>
-                      <Textarea
-                        ref={(el) => { instructionRefs.current[index] = el; }}
-                        placeholder="Describe the cooking step..."
-                        value={instruction}
-                        onChange={(e) => updateInstruction(index, e.target.value)}
-                        className="flex-1"
-                        rows={2}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeInstruction(index)}
-                        disabled={instructions.length === 1}
-                        className="mt-1"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                
+                <Droppable droppableId="sections" type="section">
+                  {(provided) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className="space-y-4"
+                    >
+                      {ingredientSections.map((section, sectionIndex) => (
+                        <Draggable
+                          key={sectionIndex}
+                          draggableId={`section-${sectionIndex}`}
+                          index={sectionIndex}
+                        >
+                          {(provided, snapshot) => (
+                            <Card
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={`p-4 ${snapshot.isDragging ? 'bg-blue-50 shadow-lg' : ''}`}
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-center space-x-2">
+                                  <div
+                                    {...provided.dragHandleProps}
+                                    className="cursor-grab hover:bg-gray-100 p-1 rounded"
+                                  >
+                                    <GripVertical className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                  <Input
+                                    ref={(el) => sectionNameRefs.current[sectionIndex] = el}
+                                    placeholder="Section name (optional, e.g., 'Cake', 'Frosting')"
+                                    value={section.sectionName || ""}
+                                    onChange={(e) => updateSectionName(sectionIndex, e.target.value)}
+                                    className="flex-1"
+                                  />
+                                  {ingredientSections.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => removeIngredientSection(sectionIndex)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                                
+                                <Droppable droppableId={`section-${sectionIndex}`} type="ingredient">
+                                  {(provided) => (
+                                    <div
+                                      {...provided.droppableProps}
+                                      ref={provided.innerRef}
+                                      className="space-y-2 pl-4 border-l-2 border-gray-200"
+                                    >
+                                      {section.items.map((item, itemIndex) => (
+                                        <Draggable
+                                          key={`${sectionIndex}-${itemIndex}`}
+                                          draggableId={`ingredient-${sectionIndex}-${itemIndex}`}
+                                          index={itemIndex}
+                                        >
+                                          {(provided, snapshot) => (
+                                            <div
+                                              ref={provided.innerRef}
+                                              {...provided.draggableProps}
+                                              className={`flex items-center space-x-2 ${snapshot.isDragging ? 'bg-blue-50 shadow-md rounded p-2' : ''}`}
+                                            >
+                                              <div
+                                                {...provided.dragHandleProps}
+                                                className="cursor-grab hover:bg-gray-100 p-1 rounded"
+                                              >
+                                                <GripVertical className="h-3 w-3 text-gray-400" />
+                                              </div>
+                                              <Input
+                                                placeholder="Quantity"
+                                                value={item.quantity || ""}
+                                                onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'quantity', e.target.value)}
+                                                className="w-20"
+                                              />
+                                              <Input
+                                                placeholder="Unit"
+                                                value={item.unit || ""}
+                                                onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'unit', e.target.value)}
+                                                className="w-20"
+                                              />
+                                              <Input
+                                                placeholder="Ingredient name"
+                                                value={item.name}
+                                                onChange={(e) => updateIngredientItem(sectionIndex, itemIndex, 'name', e.target.value)}
+                                                className="flex-1"
+                                              />
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => removeIngredientFromSection(sectionIndex, itemIndex)}
+                                                disabled={section.items.length === 1}
+                                              >
+                                                <Minus className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </Draggable>
+                                      ))}
+                                      {provided.placeholder}
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => addIngredientToSection(sectionIndex)}
+                                        className="mt-2"
+                                      >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add Ingredient
+                                      </Button>
+                                    </div>
+                                  )}
+                                </Droppable>
+                              </div>
+                            </Card>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
                     </div>
-                    <div className="ml-8">
-                      <Label className="text-xs text-muted-foreground">Optional step image (URL)</Label>
-                      <Input
-                        placeholder="https://example.com/step-image.jpg"
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={addInstruction}
-              className="mt-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Instruction
-            </Button>
-          </div>
+                  )}
+                </Droppable>
+              </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              <Save className="h-4 w-4 mr-2" />
-              {isSubmitting ? "Saving..." : "Save Changes"}
-            </Button>
+              <div>
+                <Label>Instructions *</Label>
+                <div className="space-y-2">
+                  {instructions.map((instruction, index) => (
+                    <Card key={index} className="p-3">
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-2">
+                          <span className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mt-1 flex-shrink-0">
+                            {index + 1}
+                          </span>
+                          <Textarea
+                            placeholder="Enter instruction..."
+                            value={instruction}
+                            onChange={(e) => updateInstruction(index, e.target.value)}
+                            className="flex-1"
+                            rows={2}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeInstruction(index)}
+                            disabled={instructions.length === 1}
+                            className="mt-1"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={addInstruction}
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Instruction
+                </Button>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
           </div>
-        </form>
         </DragDropContext>
       </DialogContent>
     </Dialog>
