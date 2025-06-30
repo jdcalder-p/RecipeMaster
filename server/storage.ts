@@ -229,25 +229,34 @@ export class DatabaseStorage implements IStorage {
     const ingredients: ShoppingListItem[] = [];
     
     for (const recipe of recipesData) {
-      const recipeIngredients = recipe.ingredients || [];
+      const recipeIngredientSections = recipe.ingredients || [];
       
-      for (const ingredient of recipeIngredients) {
-        const existingItem = ingredients.find(item => 
-          item.name.toLowerCase() === ingredient.toLowerCase()
-        );
-        
-        if (!existingItem) {
-          const newItem: ShoppingListItem = {
-            id: nanoid(),
-            userId,
-            name: ingredient,
-            quantity: null,
-            category: this.categorizeIngredient(ingredient),
-            isCompleted: false,
-            recipeId: recipe.id,
-            createdAt: new Date(),
-          };
-          ingredients.push(newItem);
+      for (const section of recipeIngredientSections) {
+        for (const item of section.items) {
+          const ingredientName = item.name.trim();
+          if (!ingredientName) continue;
+          
+          const existingItem = ingredients.find(shoppingItem => 
+            shoppingItem.name.toLowerCase() === ingredientName.toLowerCase()
+          );
+          
+          if (!existingItem) {
+            const quantity = item.quantity && item.unit 
+              ? `${item.quantity} ${item.unit}` 
+              : item.quantity || null;
+              
+            const newItem: ShoppingListItem = {
+              id: nanoid(),
+              userId,
+              name: ingredientName,
+              quantity,
+              category: this.categorizeIngredient(ingredientName),
+              isCompleted: false,
+              recipeId: recipe.id,
+              createdAt: new Date(),
+            };
+            ingredients.push(newItem);
+          }
         }
       }
     }
