@@ -26,6 +26,7 @@ export default function Home() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  const { user } = useAuth();
   const { data: recipes = [], isLoading } = useRecipes(searchQuery);
   const { data: shoppingListItems = [] } = useShoppingList();
 
@@ -168,6 +169,30 @@ export default function Home() {
                 <Plus className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Add Recipe</span>
               </Button>
+              
+              {/* User Info */}
+              <div className="flex items-center space-x-3">
+                {user?.profileImageUrl && (
+                  <img 
+                    src={user.profileImageUrl} 
+                    alt="Profile" 
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                )}
+                <div className="hidden sm:block text-sm">
+                  <p className="text-gray-900 font-medium">
+                    {user?.firstName || user?.email || 'User'}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.location.href = '/api/logout'}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </div>
         </div>
