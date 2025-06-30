@@ -208,6 +208,26 @@ export class RecipeScraper {
         '[class*="instruction"]',
         '.recipe-instructions li',
         '.recipe-directions li',
+        '.directions li',
+        '.method li',
+        '.steps li',
+        '.recipe-method li',
+        '.recipe-steps li',
+        '.preparation li',
+        '.how-to li',
+        'ol li',
+        '.wp-block-list li',
+        '.entry-content ol li',
+        '.recipe-card-instructions li',
+        '.instructions-list li',
+        '.directions-list li',
+        '[data-recipe-instructions] li',
+        '.recipe-instruction-text',
+        '.instruction-text',
+        '.step-description',
+        '.recipe-content ol li',
+        '.post-content ol li',
+        '.content ol li',
       ],
       cookTime: [
         '.recipe-cook-time',
@@ -232,7 +252,34 @@ export class RecipeScraper {
     const title = this.extractBySelectors($, selectors.title);
     const description = this.extractBySelectors($, selectors.description);
     const ingredients = this.extractListBySelectors($, selectors.ingredients);
-    const instructions = this.extractListBySelectors($, selectors.instructions);
+    let instructions = this.extractInstructionsBySelectors($, selectors.instructions);
+    console.log(`Found ${instructions.length} instructions using selectors:`, instructions.slice(0, 3));
+    
+    // If we didn't find many instructions, try broader searches
+    if (instructions.length < 3) {
+      console.log("Low instruction count, trying broader search...");
+      
+      // Try to find instruction content in paragraphs or divs
+      const paragraphInstructions = $('p, div').filter((_, el) => {
+        const text = $(el).text().trim();
+        // Look for numbered steps or instruction patterns
+        return /^\d+\./.test(text) || 
+               /^step \d+/i.test(text) ||
+               (text.length > 20 && text.length < 500 && 
+                (text.toLowerCase().includes('cook') || 
+                 text.toLowerCase().includes('bake') || 
+                 text.toLowerCase().includes('heat') ||
+                 text.toLowerCase().includes('add') ||
+                 text.toLowerCase().includes('stir') ||
+                 text.toLowerCase().includes('season')));
+      }).map((_, el) => $(el).text().trim()).get();
+      
+      console.log(`Found ${paragraphInstructions.length} paragraph instructions:`, paragraphInstructions.slice(0, 3));
+      
+      if (paragraphInstructions.length > instructions.length) {
+        instructions = paragraphInstructions;
+      }
+    }
     const cookTime = this.extractBySelectors($, selectors.cookTime);
     const servings = this.parseServings(this.extractBySelectors($, selectors.servings));
     const imageUrl = this.extractImageBySelectors($, selectors.image, url);
@@ -386,6 +433,43 @@ export class RecipeScraper {
       }
     }
     return '';
+  }
+
+  private static extractInstructionsBySelectors($: cheerio.CheerioAPI, selectors: string[]): string[] {
+    console.log(`Trying ${selectors.length} instruction selectors...`);
+    for (const selector of selectors) {
+      console.log(`Trying instruction selector: ${selector}`);
+      const elements = $(selector);
+      console.log(`Found ${elements.length} elements with selector: ${selector}`);
+      if (elements.length > 0) {
+        let instructions = elements.map((_, el) => $(el).text().trim()).get();
+        
+        // Handle case where instructions might be concatenated in a single element
+        instructions = instructions.flatMap((inst: string) => {
+          // Split on common separators used in instruction lists
+          if (inst.includes('\n')) {
+            return inst.split('\n').map((item: string) => item.trim()).filter(Boolean);
+          }
+          return inst;
+        });
+        
+        // Filter out very short instructions that are likely not actual steps
+        const filteredInstructions = instructions.filter(inst => 
+          inst.length > 10 && 
+          inst.length < 1000 && 
+          !inst.toLowerCase().includes('advertisement') &&
+          !inst.toLowerCase().includes('subscribe')
+        );
+        
+        console.log(`Filtered to ${filteredInstructions.length} instructions:`, filteredInstructions.slice(0, 2));
+        
+        if (filteredInstructions.length > 0) {
+          return filteredInstructions;
+        }
+      }
+    }
+    
+    return [];
   }
 
   private static extractListBySelectors($: cheerio.CheerioAPI, selectors: string[]): string[] {
