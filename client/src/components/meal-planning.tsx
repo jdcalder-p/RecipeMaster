@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMealPlan } from "@/hooks/use-meal-plan";
 import { useRecipes } from "@/hooks/use-recipes";
@@ -14,6 +15,8 @@ const MEAL_TYPES = ['breakfast', 'lunch', 'dinner'] as const;
 
 export function MealPlanning() {
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [selectedSlot, setSelectedSlot] = useState<{ date: string; mealType: string } | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -47,7 +50,7 @@ export function MealPlanning() {
   });
 
   const addMealPlanMutation = useMutation({
-    mutationFn: async ({ date, mealType, recipeId }: { date: string, mealType: string, recipeId: number }) => {
+    mutationFn: async ({ date, mealType, recipeId }: { date: string, mealType: string, recipeId: string }) => {
       return apiRequest("POST", "/api/meal-plans", {
         date,
         mealType,
@@ -56,6 +59,8 @@ export function MealPlanning() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/meal-plans'] });
+      setIsDialogOpen(false);
+      setSelectedSlot(null);
       toast({
         title: "Meal added to plan",
       });
@@ -68,6 +73,21 @@ export function MealPlanning() {
       });
     },
   });
+
+  const handleAddMeal = (date: string, mealType: string) => {
+    setSelectedSlot({ date, mealType });
+    setIsDialogOpen(true);
+  };
+
+  const handleRecipeSelect = (recipeId: string) => {
+    if (selectedSlot) {
+      addMealPlanMutation.mutate({
+        date: selectedSlot.date,
+        mealType: selectedSlot.mealType,
+        recipeId
+      });
+    }
+  };
 
   const getMealForSlot = (date: string, mealType: string) => {
     const meal = mealPlans.find(mp => mp.date === date && mp.mealType === mealType);
@@ -154,17 +174,7 @@ export function MealPlanning() {
                               variant="ghost"
                               size="sm"
                               className="text-xs text-gray-500 h-auto p-1"
-                              onClick={() => {
-                                // For demo purposes, add a random recipe
-                                if (recipes.length > 0) {
-                                  const randomRecipe = recipes[Math.floor(Math.random() * recipes.length)];
-                                  addMealPlanMutation.mutate({
-                                    date,
-                                    mealType,
-                                    recipeId: randomRecipe.id
-                                  });
-                                }
-                              }}
+                              onClick={() => handleAddMeal(date, mealType)}
                             >
                               <Plus className="h-3 w-3 mr-1" />
                               Add meal
@@ -209,6 +219,48 @@ export function MealPlanning() {
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Select Recipe for {selectedSlot?.mealType} on {selectedSlot && format(new Date(selectedSlot.date), 'MMM d')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto">
+            {recipes.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No recipes available. Create some recipes first!
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {recipes.map((recipe) => (
+                  <div
+                    key={recipe.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleRecipeSelect(recipe.id)}
+                  >
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">{recipe.title}</h4>
+                      <div className="text-sm text-gray-500 flex items-center gap-2">
+                        {recipe.cookTime && <span>⏱️ {recipe.cookTime}</span>}
+                        {recipe.servings && <span>🍽️ {recipe.servings} servings</span>}
+                        {recipe.category && <span>📂 {recipe.category}</span>}
+                      </div>
+                      {recipe.description && (
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{recipe.description}</p>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="sm">
+                      Add
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
