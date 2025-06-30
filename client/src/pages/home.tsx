@@ -26,7 +26,7 @@ export default function Home() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { data: recipes = [], isLoading } = useRecipes(searchQuery);
   const { data: shoppingListItems = [] } = useShoppingList();
 
