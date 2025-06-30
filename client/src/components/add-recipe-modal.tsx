@@ -321,6 +321,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
                 {ingredients.map((ingredient, index) => (
                   <div key={index} className="flex items-center space-x-2">
                     <Input
+                      ref={(el) => { ingredientRefs.current[index] = el; }}
                       placeholder="e.g., 2 cups flour"
                       value={ingredient}
                       onChange={(e) => updateIngredient(index, e.target.value)}
@@ -358,6 +359,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
                       {index + 1}
                     </span>
                     <Textarea
+                      ref={(el) => { instructionRefs.current[index] = el; }}
                       placeholder="Describe the cooking step..."
                       value={instruction}
                       onChange={(e) => updateInstruction(index, e.target.value)}
