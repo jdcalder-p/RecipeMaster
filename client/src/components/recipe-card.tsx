@@ -233,6 +233,14 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Schedule "{recipe.title}"</DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-4 top-4 h-6 w-6 p-0"
+              onClick={() => setIsScheduleDialogOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogHeader>
           
           <div className="space-y-4">
