@@ -398,6 +398,77 @@ export class RecipeScraper {
     return '';
   }
 
+  private static standardizeUnit(unit: string): string {
+    const unitLower = unit.toLowerCase();
+    
+    // Standardize units according to user requirements
+    const unitMap: { [key: string]: string } = {
+      // Cup variations
+      'c': 'Cup',
+      'cup': 'Cup',
+      'cups': 'Cup',
+      
+      // Tablespoon variations  
+      'tbsp': 'Tbsp',
+      'tablespoon': 'Tbsp',
+      'tablespoons': 'Tbsp',
+      't': 'Tbsp', // common abbreviation
+      
+      // Teaspoon variations
+      'tsp': 'tsp',
+      'teaspoon': 'tsp', 
+      'teaspoons': 'tsp',
+      
+      // Ounce variations
+      'oz': 'oz',
+      'ounce': 'oz',
+      'ounces': 'oz',
+      
+      // Pound variations
+      'lb': 'lb',
+      'lbs': 'lb',
+      'pound': 'lb',
+      'pounds': 'lb',
+      
+      // Gram variations
+      'g': 'g',
+      'gram': 'g',
+      'grams': 'g',
+      
+      // Other units (keep as-is but standardize casing)
+      'kg': 'kg',
+      'ml': 'ml',
+      'l': 'L',
+      'liter': 'L',
+      'liters': 'L',
+      'pint': 'pint',
+      'pints': 'pint',
+      'quart': 'quart',
+      'quarts': 'quart',
+      'gallon': 'gallon',
+      'gallons': 'gallon',
+      'clove': 'clove',
+      'cloves': 'clove',
+      'piece': 'piece',
+      'pieces': 'piece',
+      'slice': 'slice',
+      'slices': 'slice',
+      'strip': 'strip',
+      'strips': 'strip',
+      'bottle': 'bottle',
+      'bottles': 'bottle',
+      'can': 'can',
+      'cans': 'can',
+      'jar': 'jar',
+      'jars': 'jar',
+      'pkg': 'package',
+      'package': 'package',
+      'packages': 'package',
+    };
+    
+    return unitMap[unitLower] || unit; // Return standardized unit or original if not found
+  }
+
   private static parseIngredientText(ingredientText: string): { name: string; quantity?: string; unit?: string } {
     const text = ingredientText.trim();
     
@@ -423,10 +494,10 @@ export class RecipeScraper {
         
         // Check if this is a unit-based pattern (first two patterns)
         if (i < 2 && match.length >= 4) {
-          // Has explicit unit
+          // Has explicit unit - standardize it
           const result = {
             quantity: match[1],
-            unit: match[2],
+            unit: RecipeScraper.standardizeUnit(match[2]),
             name: match[3]
           };
           console.log(`Parsed with unit:`, result);

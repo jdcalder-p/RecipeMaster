@@ -16,6 +16,22 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 
+// Utility function to standardize units
+const standardizeUnit = (unit: string): string => {
+  if (!unit) return "";
+  const unitLower = unit.toLowerCase().trim();
+  
+  const unitMap: { [key: string]: string } = {
+    'c': 'Cup', 'cup': 'Cup', 'cups': 'Cup',
+    'tbsp': 'Tbsp', 'tablespoon': 'Tbsp', 'tablespoons': 'Tbsp', 't': 'Tbsp',
+    'tsp': 'tsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp',
+    'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
+    'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb',
+  };
+  
+  return unitMap[unitLower] || unit;
+};
+
 const formSchema = insertRecipeSchema.extend({
   ingredients: z.array(z.object({
     sectionName: z.string().optional(),
@@ -125,7 +141,12 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   const onSubmit = (data: InsertRecipe) => {
     const filteredSections = ingredientSections.map(section => ({
       ...section,
-      items: section.items.filter(item => item.name.trim() !== "")
+      items: section.items
+        .filter(item => item.name.trim() !== "")
+        .map(item => ({
+          ...item,
+          unit: item.unit ? standardizeUnit(item.unit) : item.unit
+        }))
     })).filter(section => section.items.length > 0);
     
     const filteredInstructions = instructions.filter(inst => inst.trim() !== "");
