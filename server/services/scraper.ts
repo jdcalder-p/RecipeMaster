@@ -107,6 +107,9 @@ export class RecipeScraper {
   }
 
   private static extractManually($: cheerio.CheerioAPI, url: string): Partial<InsertRecipe> {
+    // Try to extract ingredients with sections first
+    const ingredientsWithSections = this.extractIngredientsWithSections($);
+    
     // Common recipe site patterns
     const selectors = {
       title: [
@@ -179,12 +182,82 @@ export class RecipeScraper {
       description,
       cookTime,
       servings,
-      ingredients: ingredients.filter(Boolean).length > 0 
-        ? [{ items: ingredients.filter(Boolean).map((ing: any) => this.parseIngredientText(ing)) }]
-        : [],
+      ingredients: ingredientsWithSections.length > 0 
+        ? ingredientsWithSections 
+        : ingredients.filter(Boolean).length > 0 
+          ? [{ items: ingredients.filter(Boolean).map((ing: any) => this.parseIngredientText(ing)) }]
+          : [],
       instructions: instructions.filter(Boolean),
       imageUrl,
     };
+  }
+
+  private static extractIngredientsWithSections($: cheerio.CheerioAPI): Array<{
+    sectionName?: string;
+    items: Array<{ name: string; quantity?: string; unit?: string; }>;
+  }> {
+    const sections: Array<{
+      sectionName?: string;
+      items: Array<{ name: string; quantity?: string; unit?: string; }>;
+    }> = [];
+
+    // Try to find sections with headings followed by ingredient lists
+    const possibleSections = [
+      'h2, h3, h4, .recipe-section-title, .ingredient-section, .section-title',
+    ];
+
+    for (const sectionSelector of possibleSections) {
+      $(sectionSelector).each((_, element) => {
+        const $section = $(element);
+        const sectionTitle = $section.text().trim();
+        
+        // Look for ingredient patterns in the section title
+        const isIngredientSection = /ingredient|paste|dough|filling|icing|frosting|topping|sauce|marinade|coating|batter/i.test(sectionTitle);
+        
+        if (isIngredientSection) {
+          const ingredients: Array<{ name: string; quantity?: string; unit?: string; }> = [];
+          
+          // Look for ingredient lists following this heading
+          let nextElement = $section.next();
+          let attempts = 0;
+          
+          while (nextElement.length && attempts < 5) {
+            attempts++;
+            
+            if (nextElement.is('ul, ol')) {
+              nextElement.find('li').each((_, li) => {
+                const text = $(li).text().trim();
+                if (text && this.looksLikeIngredient(text)) {
+                  ingredients.push(this.parseIngredientText(text));
+                }
+              });
+              break;
+            } else if (nextElement.is('div, p') && this.looksLikeIngredient(nextElement.text().trim())) {
+              ingredients.push(this.parseIngredientText(nextElement.text().trim()));
+            }
+            
+            nextElement = nextElement.next();
+          }
+          
+          if (ingredients.length > 0) {
+            sections.push({
+              sectionName: sectionTitle,
+              items: ingredients
+            });
+          }
+        }
+      });
+    }
+
+    return sections;
+  }
+
+  private static looksLikeIngredient(text: string): boolean {
+    // Check if text looks like an ingredient (contains measurements, common ingredient words)
+    const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b)\b/i;
+    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese)\b/i;
+    
+    return measurementPattern.test(text) || ingredientWords.test(text);
   }
 
   private static extractBySelectors($: cheerio.CheerioAPI, selectors: string[]): string {
