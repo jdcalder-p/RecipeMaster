@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChefHat, Calendar, ShoppingCart, Users } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Landing() {
+  const { signInWithGoogle } = useAuth();
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
       <div className="max-w-6xl mx-auto px-4 py-12">
@@ -18,11 +20,11 @@ export default function Landing() {
             Organize your recipes, plan your meals, and generate shopping lists with our intuitive recipe management system.
           </p>
           <Button 
-            onClick={() => window.location.href = '/api/login'}
+            onClick={signInWithGoogle}
             size="lg" 
             className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 text-lg"
           >
-            Sign In to Get Started
+            Sign In with Google
           </Button>
         </div>
 
