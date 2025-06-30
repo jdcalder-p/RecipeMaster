@@ -98,7 +98,12 @@ export class RecipeScraper {
       cookTime,
       servings,
       ingredients: ingredients.filter(Boolean).length > 0 
-        ? [{ items: ingredients.filter(Boolean).map((ing: any) => this.parseIngredientText(ing)) }]
+        ? [{ items: ingredients.filter(Boolean).map((ing: any) => {
+            const parsed = this.parseIngredientText(ing);
+            // Capitalize the first letter of ingredient name
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          }) }]
         : [],
       instructions: instructions.filter(Boolean),
       imageUrl: this.parseImage(recipe.image),
@@ -185,7 +190,12 @@ export class RecipeScraper {
       ingredients: ingredientsWithSections.length > 0 
         ? ingredientsWithSections 
         : ingredients.filter(Boolean).length > 0 
-          ? [{ items: ingredients.filter(Boolean).map((ing: any) => this.parseIngredientText(ing)) }]
+          ? [{ items: ingredients.filter(Boolean).map((ing: any) => {
+              const parsed = this.parseIngredientText(ing);
+              // Capitalize the first letter of ingredient name
+              parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+              return parsed;
+            }) }]
           : [],
       instructions: instructions.filter(Boolean),
       imageUrl,
@@ -203,7 +213,7 @@ export class RecipeScraper {
 
     // Try to find sections with headings followed by ingredient lists
     const possibleSections = [
-      'h2, h3, h4, .recipe-section-title, .ingredient-section, .section-title',
+      'h2, h3, h4, h5, h6, .recipe-section-title, .ingredient-section, .section-title, strong, b, .wp-block-heading, .has-text-align-center, .ingredient-header',
     ];
 
     for (const sectionSelector of possibleSections) {
@@ -211,8 +221,8 @@ export class RecipeScraper {
         const $section = $(element);
         const sectionTitle = $section.text().trim();
         
-        // Look for ingredient patterns in the section title
-        const isIngredientSection = /ingredient|paste|dough|filling|icing|frosting|topping|sauce|marinade|coating|batter/i.test(sectionTitle);
+        // Look for ingredient patterns in the section title - expanded list
+        const isIngredientSection = /ingredient|paste|dough|filling|icing|frosting|topping|sauce|marinade|coating|batter|roll|cinnamon|for the|glaze|syrup|mixture|base|cream|cheese/i.test(sectionTitle);
         
         if (isIngredientSection) {
           const ingredients: Array<{ name: string; quantity?: string; unit?: string; }> = [];
@@ -228,12 +238,18 @@ export class RecipeScraper {
               nextElement.find('li').each((_, li) => {
                 const text = $(li).text().trim();
                 if (text && this.looksLikeIngredient(text)) {
-                  ingredients.push(this.parseIngredientText(text));
+                  const parsed = this.parseIngredientText(text);
+                  // Capitalize the first letter of ingredient name
+                  parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+                  ingredients.push(parsed);
                 }
               });
               break;
             } else if (nextElement.is('div, p') && this.looksLikeIngredient(nextElement.text().trim())) {
-              ingredients.push(this.parseIngredientText(nextElement.text().trim()));
+              const parsed = this.parseIngredientText(nextElement.text().trim());
+              // Capitalize the first letter of ingredient name
+              parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+              ingredients.push(parsed);
             }
             
             nextElement = nextElement.next();
