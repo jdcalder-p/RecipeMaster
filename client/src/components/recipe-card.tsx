@@ -65,7 +65,6 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/meal-plans'] });
-      setIsScheduleDialogOpen(false);
       setSelectedDate("");
       setSelectedMealType("");
       toast({
@@ -339,9 +338,12 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setIsScheduleDialogOpen(false)}
+                onClick={() => {
+                  setSelectedDate("");
+                  setSelectedMealType("");
+                }}
               >
-                Cancel
+                Clear
               </Button>
             </div>
 
