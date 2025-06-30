@@ -129,7 +129,7 @@ export class DatabaseStorage implements IStorage {
         eq(mealPlans.userId, userId),
         gte(mealPlans.date, startDate),
         lte(mealPlans.date, endDate)
-      );
+      )!;
     }
 
     return await db
