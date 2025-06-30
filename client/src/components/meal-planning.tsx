@@ -161,7 +161,7 @@ export function MealPlanning() {
                                   addMealPlanMutation.mutate({
                                     date,
                                     mealType,
-                                    recipeId: parseInt(randomRecipe.id)
+                                    recipeId: randomRecipe.id
                                   });
                                 }
                               }}

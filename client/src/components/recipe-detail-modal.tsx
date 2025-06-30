@@ -50,7 +50,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange }: RecipeDetailMo
           quantity: "1",
           category: "Other",
           isCompleted: false,
-          recipeId: parseInt(recipe.id)
+          recipeId: recipe.id
         })
       );
       
