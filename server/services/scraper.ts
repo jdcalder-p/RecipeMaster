@@ -127,6 +127,17 @@ export class RecipeScraper {
         '.ingredients li',
         '[class*="ingredient"]',
         '.recipe-ingredients li',
+        '.wp-block-recipe-card-ingredient',
+        '.recipe-card-ingredient',
+        '.recipe-ingredients .ingredient',
+        '.ingredient-list li',
+        '.ingredients-list li',
+        '.recipe-instructions li:contains("cup"):contains("tbsp"):contains("tsp")',
+        '.entry-content li:contains("cup")',
+        '.entry-content li:contains("tbsp")',
+        '.entry-content li:contains("tsp")',
+        '.entry-content ul li',
+        'ul li',
       ],
       instructions: [
         '.recipe-instruction',
@@ -187,8 +198,11 @@ export class RecipeScraper {
   }
 
   private static extractListBySelectors($: cheerio.CheerioAPI, selectors: string[]): string[] {
+    console.log(`Trying ${selectors.length} ingredient selectors...`);
     for (const selector of selectors) {
+      console.log(`Trying selector: ${selector}`);
       const elements = $(selector);
+      console.log(`Found ${elements.length} elements with selector: ${selector}`);
       if (elements.length) {
         let ingredients = elements.map((_, el) => $(el).text().trim()).get();
         
@@ -208,10 +222,42 @@ export class RecipeScraper {
           return ing;
         });
         
+        // Filter ingredients to only include ones that look like ingredients (contain common measurements)
+        const measurementPattern = /\b(\d+\/?\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?)\b/i;
+        
+        const filteredIngredients = ingredients.filter(ing => {
+          const text = ing.toLowerCase();
+          // Keep if it contains measurements or common ingredient words
+          return measurementPattern.test(ing) || 
+                 text.includes('salt') || text.includes('pepper') || text.includes('flour') || 
+                 text.includes('sugar') || text.includes('butter') || text.includes('egg') ||
+                 text.includes('milk') || text.includes('water') || text.includes('oil') ||
+                 text.includes('yeast') || text.includes('vanilla') || text.includes('cinnamon');
+        });
+        
+        if (filteredIngredients.length > 0) {
+          return filteredIngredients;
+        }
+        
+        // If filtered list is empty, return all ingredients (some recipes might not have standard measurements)
         return ingredients.filter(Boolean);
       }
     }
-    return [];
+    
+    // Last resort: try to extract from the entire page content
+    const allText = $('body').text();
+    const lines = allText.split('\n').map(line => line.trim()).filter(Boolean);
+    
+    const ingredientLines = lines.filter(line => {
+      const text = line.toLowerCase();
+      // Look for lines that seem like ingredients
+      return /\b(\d+\/?\d*)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?)\b/i.test(line) ||
+             (text.includes('cup') && text.length < 100) ||
+             (text.includes('tbsp') && text.length < 100) ||
+             (text.includes('tsp') && text.length < 100);
+    });
+    
+    return ingredientLines.slice(0, 20); // Limit to reasonable number
   }
 
   private static extractImageBySelectors($: cheerio.CheerioAPI, selectors: string[], baseUrl: string): string {
