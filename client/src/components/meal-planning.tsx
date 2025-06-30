@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { useMealPlan } from "@/hooks/use-meal-plan";
 import { useRecipes } from "@/hooks/use-recipes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -79,6 +79,25 @@ export function MealPlanning() {
     setIsDialogOpen(true);
   };
 
+  const deleteMealPlanMutation = useMutation({
+    mutationFn: async (mealPlanId: string) => {
+      return apiRequest("DELETE", `/api/meal-plans/${mealPlanId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/meal-plans'] });
+      toast({
+        title: "Meal removed from plan",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove meal from plan",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleRecipeSelect = (recipeId: string) => {
     if (selectedSlot) {
       addMealPlanMutation.mutate({
@@ -86,6 +105,13 @@ export function MealPlanning() {
         mealType: selectedSlot.mealType,
         recipeId
       });
+    }
+  };
+
+  const handleRemoveMeal = (date: string, mealType: string) => {
+    const mealPlan = mealPlans.find(mp => mp.date === date && mp.mealType === mealType);
+    if (mealPlan) {
+      deleteMealPlanMutation.mutate(mealPlan.id);
     }
   };
 
@@ -162,7 +188,18 @@ export function MealPlanning() {
                       <div className="text-sm text-gray-600 font-medium capitalize mb-1">{mealType}</div>
                       <div className="min-h-[60px] border-2 border-dashed border-gray-200 rounded-lg p-2 hover:border-primary transition-colors">
                         {recipe ? (
-                          <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                          <div className="bg-blue-50 border border-blue-200 rounded p-2 relative group">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="absolute -top-1 -right-1 h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-red-100 hover:bg-red-200 border border-red-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveMeal(date, mealType);
+                              }}
+                            >
+                              <X className="h-3 w-3 text-red-600" />
+                            </Button>
                             <div className="text-xs font-medium text-blue-900 line-clamp-1">{recipe.title}</div>
                             <div className="text-xs text-blue-700">
                               {recipe.cookTime} • {recipe.servings} servings
