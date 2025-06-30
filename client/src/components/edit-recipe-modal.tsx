@@ -138,6 +138,11 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     }
   }, [recipe, open, reset, setValue]);
 
+  // Sync instructions state with form
+  useEffect(() => {
+    setValue("instructions", instructions);
+  }, [instructions, setValue]);
+
   const updateMutation = useMutation({
     mutationFn: async (data: InsertRecipe) => {
       if (!recipe) throw new Error("No recipe to update");
