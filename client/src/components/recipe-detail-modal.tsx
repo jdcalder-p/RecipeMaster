@@ -35,9 +35,6 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
       return name;
     }
 
-    // Parse the entire quantity string to extract the numeric value
-    let totalQuantity = 0;
-
     // Handle Unicode fractions
     const unicodeFractions: { [key: string]: number } = {
       '¼': 0.25,
@@ -52,6 +49,102 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
       '⅙': 1/6,
       '⅚': 5/6
     };
+
+    // Check for range quantities like "1 to 2", "1-2", "1 or 2"
+    const rangeMatch = quantity.trim().match(/^(\d+(?:\.\d+)?(?:[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])?(?:\/\d+)?)\s+(?:to|-|or)\s+(\d+(?:\.\d+)?(?:[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])?(?:\/\d+)?)$/i);
+    
+    if (rangeMatch) {
+      // Parse both parts of the range
+      const parseQuantityPart = (part: string): number => {
+        if (unicodeFractions[part]) {
+          return unicodeFractions[part];
+        }
+        if (/\d+[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚]/.test(part)) {
+          const match = part.match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])$/);
+          if (match) {
+            return parseInt(match[1]) + unicodeFractions[match[2]];
+          }
+        }
+        if (part.includes('/')) {
+          const [num, denom] = part.split('/').map(Number);
+          return num / denom;
+        }
+        return parseFloat(part);
+      };
+
+      const firstValue = parseQuantityPart(rangeMatch[1]);
+      const secondValue = parseQuantityPart(rangeMatch[2]);
+      
+      // Scale both values
+      const scaledFirst = firstValue * multiplier;
+      const scaledSecond = secondValue * multiplier;
+      
+      // Convert both scaled values to fraction format
+      const formatNumber = (num: number): string => {
+        const tolerance = 0.001;
+        const commonFractions = [
+          { decimal: 1/4, fraction: '¼' },
+          { decimal: 1/3, fraction: '⅓' },
+          { decimal: 1/2, fraction: '½' },
+          { decimal: 2/3, fraction: '⅔' },
+          { decimal: 3/4, fraction: '¾' },
+          { decimal: 1/8, fraction: '⅛' },
+          { decimal: 3/8, fraction: '⅜' },
+          { decimal: 5/8, fraction: '⅝' },
+          { decimal: 7/8, fraction: '⅞' },
+          { decimal: 1/6, fraction: '⅙' },
+          { decimal: 5/6, fraction: '⅚' },
+        ];
+
+        const wholePart = Math.floor(num);
+        const fractionalPart = num - wholePart;
+
+        // Check if the entire number matches a common fraction
+        for (const { decimal, fraction } of commonFractions) {
+          if (Math.abs(num - decimal) < tolerance) {
+            return fraction;
+          }
+        }
+
+        // Check if just the fractional part matches
+        for (const { decimal, fraction } of commonFractions) {
+          if (Math.abs(fractionalPart - decimal) < tolerance) {
+            return wholePart > 0 ? `${wholePart} ${fraction}` : fraction;
+          }
+        }
+
+        // Try to convert to simple fraction
+        if (fractionalPart > 0) {
+          for (let denom = 2; denom <= 16; denom++) {
+            const numerator = Math.round(fractionalPart * denom);
+            if (Math.abs(fractionalPart - numerator / denom) < tolerance) {
+              const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+              const commonDivisor = gcd(numerator, denom);
+              const finalNum = numerator / commonDivisor;
+              const finalDenom = denom / commonDivisor;
+              
+              if (finalDenom !== 1) {
+                return wholePart > 0 ? `${wholePart} ${finalNum}/${finalDenom}` : `${finalNum}/${finalDenom}`;
+              }
+            }
+          }
+        }
+
+        // For whole numbers
+        if (num % 1 === 0) {
+          return num.toString();
+        }
+
+        // As decimal if we can't convert to a nice fraction
+        return num.toFixed(2).replace(/\.?0+$/, '');
+      };
+
+      const scaledQuantity = `${formatNumber(scaledFirst)} to ${formatNumber(scaledSecond)}`;
+      return `${scaledQuantity}${unit ? ' ' + unit : ''} ${name}`;
+    }
+
+    // Parse the entire quantity string to extract the numeric value for non-range quantities
+    let totalQuantity = 0;
 
     // Check if the entire quantity is a single Unicode fraction
     if (unicodeFractions[quantity.trim()]) {
