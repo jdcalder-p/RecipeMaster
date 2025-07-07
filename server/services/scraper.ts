@@ -40,6 +40,16 @@ export class RecipeScraper {
         console.log(`✅ SCRAPING: JSON-LD extraction successful, found recipe data`);
         console.log(`📊 JSON-LD INSTRUCTIONS COUNT:`, jsonLd.instructions?.length || 0);
         console.log(`📊 JSON-LD FIRST 3 INSTRUCTIONS:`, jsonLd.instructions?.slice(0, 3));
+        
+        // If no video URL found in JSON-LD, try manual extraction
+        if (!jsonLd.videoUrl) {
+          const videoUrl = this.extractVideoUrl($);
+          if (videoUrl) {
+            jsonLd.videoUrl = videoUrl;
+            console.log(`📹 SCRAPING: Found video URL via manual extraction: ${videoUrl}`);
+          }
+        }
+        
         return jsonLd;
       }
 
@@ -192,6 +202,7 @@ export class RecipeScraper {
       instructions: instructions.filter(Boolean).map(text => ({ text })),
       imageUrl: this.parseImage(recipe.image),
       category: this.parseCategory(recipe.recipeCategory),
+      videoUrl: recipe.video?.contentUrl || recipe.video?.embedUrl || '',
     };
   }
 
