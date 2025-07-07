@@ -35,12 +35,30 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
       return name;
     }
 
-    // Handle different number formats including fractions
-    const scaledQuantity = quantity.replace(/(\d+(?:\s+\d+\/\d+)?|\d+\/\d+|\d+\.?\d*)/g, (match) => {
+    // Handle different number formats including fractions and Unicode fractions
+    const scaledQuantity = quantity.replace(/(\d+(?:\s+\d+\/\d+)?|\d+\/\d+|\d+\.?\d*|¼|½|¾|⅓|⅔|⅛|⅜|⅝|⅞|⅙|⅚)/g, (match) => {
       let num: number;
       
+      // Handle Unicode fractions
+      const unicodeFractions: { [key: string]: number } = {
+        '¼': 0.25,
+        '½': 0.5, 
+        '¾': 0.75,
+        '⅓': 1/3,
+        '⅔': 2/3,
+        '⅛': 0.125,
+        '⅜': 0.375,
+        '⅝': 0.625,
+        '⅞': 0.875,
+        '⅙': 1/6,
+        '⅚': 5/6
+      };
+      
+      if (unicodeFractions[match]) {
+        num = unicodeFractions[match];
+      }
       // Handle mixed numbers like "1 1/2"
-      if (match.includes(' ') && match.includes('/')) {
+      else if (match.includes(' ') && match.includes('/')) {
         const parts = match.split(' ');
         const whole = parseInt(parts[0]);
         const [numerator, denominator] = parts[1].split('/').map(Number);
@@ -59,23 +77,23 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
       const scaled = num * multiplier;
       
       // Convert back to fraction format for better readability
-      if (match.includes('/')) {
+      if (match.includes('/') || unicodeFractions[match]) {
         // For fractions, try to maintain fractional format when possible
         const tolerance = 0.001;
         
-        // Common fractions to check
+        // Common fractions to check - prioritize Unicode fractions for better display
         const commonFractions = [
-          { decimal: 1/4, fraction: '1/4' },
-          { decimal: 1/3, fraction: '1/3' },
-          { decimal: 1/2, fraction: '1/2' },
-          { decimal: 2/3, fraction: '2/3' },
-          { decimal: 3/4, fraction: '3/4' },
-          { decimal: 1/8, fraction: '1/8' },
-          { decimal: 3/8, fraction: '3/8' },
-          { decimal: 5/8, fraction: '5/8' },
-          { decimal: 7/8, fraction: '7/8' },
-          { decimal: 1/6, fraction: '1/6' },
-          { decimal: 5/6, fraction: '5/6' },
+          { decimal: 1/4, fraction: '¼' },
+          { decimal: 1/3, fraction: '⅓' },
+          { decimal: 1/2, fraction: '½' },
+          { decimal: 2/3, fraction: '⅔' },
+          { decimal: 3/4, fraction: '¾' },
+          { decimal: 1/8, fraction: '⅛' },
+          { decimal: 3/8, fraction: '⅜' },
+          { decimal: 5/8, fraction: '⅝' },
+          { decimal: 7/8, fraction: '⅞' },
+          { decimal: 1/6, fraction: '⅙' },
+          { decimal: 5/6, fraction: '⅚' },
         ];
         
         // Check if scaled value is close to a common fraction
