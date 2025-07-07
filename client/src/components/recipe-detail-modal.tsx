@@ -30,55 +30,59 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   // Helper function to scale ingredient quantities
   const scaleIngredientItem = (item: { name: string; quantity?: string; unit?: string }, multiplier: number): string => {
     const { name, quantity, unit } = item;
-    
+
     if (!quantity) {
       return name;
     }
 
-    // Handle different number formats including fractions and Unicode fractions
-    const scaledQuantity = quantity.replace(/(\d+(?:\s+\d+\/\d+)?|\d+\/\d+|\d+\.?\d*|¼|½|¾|⅓|⅔|⅛|⅜|⅝|⅞|⅙|⅚)/g, (match) => {
-      let num: number;
-      
-      // Handle Unicode fractions
-      const unicodeFractions: { [key: string]: number } = {
-        '¼': 0.25,
-        '½': 0.5, 
-        '¾': 0.75,
-        '⅓': 1/3,
-        '⅔': 2/3,
-        '⅛': 0.125,
-        '⅜': 0.375,
-        '⅝': 0.625,
-        '⅞': 0.875,
-        '⅙': 1/6,
-        '⅚': 5/6
-      };
-      
-      if (unicodeFractions[match]) {
-        num = unicodeFractions[match];
+    // Parse the entire quantity string to extract the numeric value
+    let totalQuantity = 0;
+
+    // Handle Unicode fractions
+    const unicodeFractions: { [key: string]: number } = {
+      '¼': 0.25,
+      '½': 0.5, 
+      '¾': 0.75,
+      '⅓': 1/3,
+      '⅔': 2/3,
+      '⅛': 0.125,
+      '⅜': 0.375,
+      '⅝': 0.625,
+      '⅞': 0.875,
+      '⅙': 1/6,
+      '⅚': 5/6
+    };
+
+    // Check if the entire quantity is a single Unicode fraction
+    if (unicodeFractions[quantity.trim()]) {
+      totalQuantity = unicodeFractions[quantity.trim()];
+    }
+    // Handle mixed numbers like "1 1/2"
+    else if (quantity.includes(' ') && quantity.includes('/')) {
+      const parts = quantity.trim().split(' ');
+      const whole = parseInt(parts[0]);
+      const [numerator, denominator] = parts[1].split('/').map(Number);
+      totalQuantity = whole + (numerator / denominator);
+    }
+    // Handle simple fractions like "1/2"
+    else if (quantity.includes('/')) {
+      const [numerator, denominator] = quantity.split('/').map(Number);
+      totalQuantity = numerator / denominator;
+    }
+    // Handle decimal numbers
+    else {
+      const match = quantity.match(/(\d+\.?\d*)/);
+      if (match) {
+        totalQuantity = parseFloat(match[1]);
       }
-      // Handle mixed numbers like "1 1/2"
-      else if (match.includes(' ') && match.includes('/')) {
-        const parts = match.split(' ');
-        const whole = parseInt(parts[0]);
-        const [numerator, denominator] = parts[1].split('/').map(Number);
-        num = whole + (numerator / denominator);
-      }
-      // Handle simple fractions like "1/2"
-      else if (match.includes('/')) {
-        const [numerator, denominator] = match.split('/').map(Number);
-        num = numerator / denominator;
-      }
-      // Handle decimal numbers
-      else {
-        num = parseFloat(match);
-      }
-      
-      const scaled = num * multiplier;
-      
-      // Always convert to fraction format for consistency
+    }
+
+    const scaled = totalQuantity * multiplier;
+
+    // Convert scaled result back to fraction format
+    const scaledQuantity = (() => {
       const tolerance = 0.001;
-      
+
       // Common fractions to check - prioritize Unicode fractions for better display
       const commonFractions = [
         { decimal: 1/4, fraction: '¼' },
@@ -93,25 +97,25 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
         { decimal: 1/6, fraction: '⅙' },
         { decimal: 5/6, fraction: '⅚' },
       ];
-      
+
       // Check if scaled value is close to a common fraction
       const wholePart = Math.floor(scaled);
       const fractionalPart = scaled - wholePart;
-      
+
       // First check if the entire scaled value (including whole part) matches a common fraction
       for (const { decimal, fraction } of commonFractions) {
         if (Math.abs(scaled - decimal) < tolerance) {
           return fraction;
         }
       }
-      
+
       // Then check if just the fractional part matches
       for (const { decimal, fraction } of commonFractions) {
         if (Math.abs(fractionalPart - decimal) < tolerance) {
           return wholePart > 0 ? `${wholePart} ${fraction}` : fraction;
         }
       }
-      
+
       // If no common fraction matches, try to convert to simple fraction
       if (fractionalPart > 0) {
         // Try to find a simple fraction representation
@@ -120,28 +124,28 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
           if (Math.abs(fractionalPart - numerator / denom) < tolerance) {
             const simplifiedNum = numerator;
             const simplifiedDenom = denom;
-            
+
             // Reduce the fraction
             const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
             const commonDivisor = gcd(simplifiedNum, simplifiedDenom);
             const finalNum = simplifiedNum / commonDivisor;
             const finalDenom = simplifiedDenom / commonDivisor;
-            
+
             if (finalDenom !== 1) {
               return wholePart > 0 ? `${wholePart} ${finalNum}/${finalDenom}` : `${finalNum}/${finalDenom}`;
             }
           }
         }
       }
-      
+
       // For whole numbers
       if (scaled % 1 === 0) {
         return scaled.toString();
       }
-      
+
       // If we can't convert to a nice fraction, return as decimal but only as last resort
       return scaled.toFixed(2).replace(/\.?0+$/, '');
-    });
+    })();
 
     return `${scaledQuantity}${unit ? ' ' + unit : ''} ${name}`;
   };
@@ -171,7 +175,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   const addToShoppingListMutation = useMutation({
     mutationFn: async () => {
       if (!recipe) return;
-      
+
       // Add each ingredient as a shopping list item
       const promises = recipe.ingredients.map(ingredient => 
         apiRequest("POST", "/api/shopping-list", {
@@ -182,7 +186,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
           recipeId: recipe.id
         })
       );
-      
+
       return Promise.all(promises);
     },
     onSuccess: () => {
