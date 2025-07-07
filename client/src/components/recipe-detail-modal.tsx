@@ -382,6 +382,37 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
             </div>
           )}
 
+          {recipe.videoUrl && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Video</h3>
+              <div className="aspect-video w-full rounded-lg overflow-hidden">
+                {recipe.videoUrl.includes('youtube.com') || recipe.videoUrl.includes('youtu.be') ? (
+                  <iframe
+                    src={recipe.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                    title="Recipe video"
+                    className="w-full h-full"
+                    allowFullScreen
+                  />
+                ) : recipe.videoUrl.includes('vimeo.com') ? (
+                  <iframe
+                    src={recipe.videoUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
+                    title="Recipe video"
+                    className="w-full h-full"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    src={recipe.videoUrl}
+                    controls
+                    className="w-full h-full object-cover"
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>
               <div className="flex items-center justify-between mb-4">
