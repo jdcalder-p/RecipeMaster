@@ -99,7 +99,21 @@ export class RecipeScraper {
     const instructions = this.parseInstructions(recipe.recipeInstructions || []);
     
     const cookTime = this.parseDuration(recipe.cookTime || recipe.totalTime);
-    const servings = this.parseServings(recipe.recipeYield);
+    let servings = this.parseServings(recipe.recipeYield);
+    
+    // If servings is 1 (default), try to extract from instructions or description
+    if (servings === 1) {
+      const allText = [
+        recipe.description || '',
+        ...(instructions || []),
+        recipe.name || ''
+      ].join(' ');
+      
+      const extractedServings = this.extractServingsFromText(allText);
+      if (extractedServings) {
+        servings = extractedServings;
+      }
+    }
 
     // Check if this is a cinnamon rolls recipe and override with structured sections if needed
     let structuredIngredients: Array<{
@@ -294,7 +308,23 @@ export class RecipeScraper {
       }
     }
     const cookTime = this.extractBySelectors($, selectors.cookTime);
-    const servings = this.parseServings(this.extractBySelectors($, selectors.servings));
+    let servings = this.parseServings(this.extractBySelectors($, selectors.servings));
+    
+    // If servings is 1 (default), try to extract from page content
+    if (servings === 1) {
+      const allText = [
+        title || '',
+        description || '',
+        ...instructions,
+        $('body').text()
+      ].join(' ');
+      
+      const extractedServings = this.extractServingsFromText(allText);
+      if (extractedServings) {
+        servings = extractedServings;
+      }
+    }
+    
     const imageUrl = this.extractImageBySelectors($, selectors.image, url);
     const videoUrl = RecipeScraper.extractVideoUrl($);
 
@@ -722,6 +752,33 @@ export class RecipeScraper {
       return match ? parseInt(match[0]) : 1;
     }
     return 1;
+  }
+
+  private static extractServingsFromText(text: string): number | null {
+    if (!text) return null;
+    
+    // Look for serving patterns in text
+    const servingPatterns = [
+      /makes?\s+(\d+)\s+servings?/i,
+      /serves?\s+(\d+)/i,
+      /(\d+)\s+servings?/i,
+      /yields?\s+(\d+)/i,
+      /portions?\s*:?\s*(\d+)/i,
+      /recipe\s+makes?\s+(\d+)/i,
+    ];
+    
+    for (const pattern of servingPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const servings = parseInt(match[1]);
+        if (servings > 0 && servings <= 100) { // Reasonable range
+          console.log(`Found servings in text: ${servings} from "${text}"`);
+          return servings;
+        }
+      }
+    }
+    
+    return null;
   }
 
   private static parseImage(image: any): string {
