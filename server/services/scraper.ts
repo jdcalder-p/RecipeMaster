@@ -753,6 +753,7 @@ export class RecipeScraper {
       
       // Tablespoon variations  
       'tbsp': 'Tbsp',
+      'tbs': 'Tbsp',
       'tablespoon': 'Tbsp',
       'tablespoons': 'Tbsp',
       't': 'Tbsp', // common abbreviation
@@ -764,6 +765,7 @@ export class RecipeScraper {
       
       // Ounce variations
       'oz': 'oz',
+      'ozs': 'oz',
       'ounce': 'oz',
       'ounces': 'oz',
       
@@ -780,7 +782,11 @@ export class RecipeScraper {
       
       // Other units (keep as-is but standardize casing)
       'kg': 'kg',
+      'kilogram': 'kg',
+      'kilograms': 'kg',
       'ml': 'ml',
+      'milliliter': 'ml',
+      'milliliters': 'ml',
       'l': 'L',
       'liter': 'L',
       'liters': 'L',
@@ -817,10 +823,14 @@ export class RecipeScraper {
     
     // Common patterns for quantity and unit extraction
     const patterns = [
-      // "1/3 c 2% or whole milk" -> quantity: "1/3", unit: "c", name: "2% or whole milk"
-      /^(\d+(?:\.\d+)?(?:\/\d+)?)\s+(c|cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|lb|lbs|pound|pounds|oz|ounce|ounces|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|pint|pints|quart|quarts|gallon|gallons|clove|cloves|piece|pieces|slice|slices|strip|strips|bottle|bottles|can|cans|jar|jars|pkg|package|packages)\s+(.+)$/i,
+      // "4 ozs Sweet Butter" -> quantity: "4", unit: "ozs", name: "Sweet Butter"
+      /^(\d+(?:\.\d+)?(?:\/\d+)?)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
       // "1/2 cup sugar" -> quantity: "1/2", unit: "cup", name: "sugar"
-      /^(\d+\/\d+)\s+(c|cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|lb|lbs|pound|pounds|oz|ounce|ounces|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|pint|pints|quart|quarts|gallon|gallons|clove|cloves|piece|pieces|slice|slices|strip|strips|bottle|bottles|can|cans|jar|jars|pkg|package|packages)\s+(.+)$/i,
+      /^(\d+\/\d+)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
+      // "1½ lbs cooked Elbow Pasta" -> quantity: "1½", unit: "lbs", name: "cooked Elbow Pasta"
+      /^(\d+½|\d+¼|\d+¾)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
+      // "¼ tsp ground Nutmeg" -> quantity: "¼", unit: "tsp", name: "ground Nutmeg"
+      /^(¼|½|¾|\d+¼|\d+½|\d+¾)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
       // "2-3 apples" -> quantity: "2-3", unit: "", name: "apples"
       /^(\d+(?:-\d+)?)\s+(.+)$/,
       // "A pinch of salt" -> quantity: "A pinch", unit: "", name: "salt"
@@ -835,8 +845,8 @@ export class RecipeScraper {
       if (match) {
         console.log(`Pattern ${i} matched:`, match);
         
-        // Check if this is a unit-based pattern (first two patterns)
-        if (i < 2 && match.length >= 4) {
+        // Check if this is a unit-based pattern (first four patterns)
+        if (i < 4 && match.length >= 4) {
           // Has explicit unit - standardize it
           const result = {
             quantity: match[1],
