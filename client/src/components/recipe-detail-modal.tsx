@@ -57,6 +57,15 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
     if (unicodeFractions[quantity.trim()]) {
       totalQuantity = unicodeFractions[quantity.trim()];
     }
+    // Handle mixed Unicode fractions like "1½", "2¾", etc.
+    else if (/\d+[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚]/.test(quantity.trim())) {
+      const match = quantity.trim().match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])$/);
+      if (match) {
+        const wholePart = parseInt(match[1]);
+        const fractionPart = unicodeFractions[match[2]];
+        totalQuantity = wholePart + fractionPart;
+      }
+    }
     // Handle mixed numbers like "1 1/2"
     else if (quantity.includes(' ') && quantity.includes('/')) {
       const parts = quantity.trim().split(' ');
