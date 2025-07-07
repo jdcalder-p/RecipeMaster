@@ -410,8 +410,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
                     onClick={() => setPortionMultiplier(2)}
                     className={portionMultiplier === 2 ? "bg-primary text-white" : ""}
                   >
-                    <X className="h-4 w-4 mr-1" />
-                    2
+                    x2
                   </Button>
                 </div>
               </div>
