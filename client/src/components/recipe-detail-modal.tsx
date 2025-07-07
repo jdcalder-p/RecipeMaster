@@ -35,11 +35,39 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
       return name;
     }
 
-    // Extract numbers from quantity using regex
-    const numberPattern = /(\d+\.?\d*|\d*\.?\d+)/g;
-    const scaledQuantity = quantity.replace(numberPattern, (match) => {
-      const num = parseFloat(match);
+    // Handle different number formats including fractions
+    const scaledQuantity = quantity.replace(/(\d+(?:\s+\d+\/\d+)?|\d+\/\d+|\d+\.?\d*)/g, (match) => {
+      let num: number;
+      
+      // Handle mixed numbers like "1 1/2"
+      if (match.includes(' ') && match.includes('/')) {
+        const parts = match.split(' ');
+        const whole = parseInt(parts[0]);
+        const [numerator, denominator] = parts[1].split('/').map(Number);
+        num = whole + (numerator / denominator);
+      }
+      // Handle simple fractions like "1/2"
+      else if (match.includes('/')) {
+        const [numerator, denominator] = match.split('/').map(Number);
+        num = numerator / denominator;
+      }
+      // Handle decimal numbers
+      else {
+        num = parseFloat(match);
+      }
+      
       const scaled = num * multiplier;
+      
+      // Convert back to fraction if original was a fraction and result is clean
+      if (match.includes('/') && !match.includes(' ')) {
+        // Try to convert to a simple fraction for common multipliers
+        if (multiplier === 0.5) {
+          return (scaled % 1 === 0 ? scaled.toString() : `${Math.round(scaled * 2)}/2`);
+        } else if (multiplier === 2) {
+          return (scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(2).replace(/\.?0+$/, ''));
+        }
+      }
+      
       // Round to 2 decimal places and remove trailing zeros
       return (scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(2).replace(/\.?0+$/, ''));
     });
