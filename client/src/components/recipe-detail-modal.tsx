@@ -76,74 +76,71 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
       
       const scaled = num * multiplier;
       
-      // Convert back to fraction format for better readability
-      if (match.includes('/') || unicodeFractions[match]) {
-        // For fractions, try to maintain fractional format when possible
-        const tolerance = 0.001;
-        
-        // Common fractions to check - prioritize Unicode fractions for better display
-        const commonFractions = [
-          { decimal: 1/4, fraction: '¼' },
-          { decimal: 1/3, fraction: '⅓' },
-          { decimal: 1/2, fraction: '½' },
-          { decimal: 2/3, fraction: '⅔' },
-          { decimal: 3/4, fraction: '¾' },
-          { decimal: 1/8, fraction: '⅛' },
-          { decimal: 3/8, fraction: '⅜' },
-          { decimal: 5/8, fraction: '⅝' },
-          { decimal: 7/8, fraction: '⅞' },
-          { decimal: 1/6, fraction: '⅙' },
-          { decimal: 5/6, fraction: '⅚' },
-        ];
-        
-        // Check if scaled value is close to a common fraction
-        const wholePart = Math.floor(scaled);
-        const fractionalPart = scaled - wholePart;
-        
-        // First check if the entire scaled value (including whole part) matches a common fraction
-        for (const { decimal, fraction } of commonFractions) {
-          if (Math.abs(scaled - decimal) < tolerance) {
-            return fraction;
-          }
-        }
-        
-        // Then check if just the fractional part matches
-        for (const { decimal, fraction } of commonFractions) {
-          if (Math.abs(fractionalPart - decimal) < tolerance) {
-            return wholePart > 0 ? `${wholePart} ${fraction}` : fraction;
-          }
-        }
-        
-        // If no common fraction matches, try to convert to simple fraction
-        if (fractionalPart > 0) {
-          // Try to find a simple fraction representation
-          for (let denom = 2; denom <= 16; denom++) {
-            const numerator = Math.round(fractionalPart * denom);
-            if (Math.abs(fractionalPart - numerator / denom) < tolerance) {
-              const simplifiedNum = numerator;
-              const simplifiedDenom = denom;
-              
-              // Reduce the fraction
-              const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
-              const commonDivisor = gcd(simplifiedNum, simplifiedDenom);
-              const finalNum = simplifiedNum / commonDivisor;
-              const finalDenom = simplifiedDenom / commonDivisor;
-              
-              if (finalDenom !== 1) {
-                return wholePart > 0 ? `${wholePart} ${finalNum}/${finalDenom}` : `${finalNum}/${finalDenom}`;
-              }
-            }
-          }
-        }
-        
-        // For whole numbers resulting from fraction scaling
-        if (scaled % 1 === 0) {
-          return scaled.toString();
+      // Always convert to fraction format for consistency
+      const tolerance = 0.001;
+      
+      // Common fractions to check - prioritize Unicode fractions for better display
+      const commonFractions = [
+        { decimal: 1/4, fraction: '¼' },
+        { decimal: 1/3, fraction: '⅓' },
+        { decimal: 1/2, fraction: '½' },
+        { decimal: 2/3, fraction: '⅔' },
+        { decimal: 3/4, fraction: '¾' },
+        { decimal: 1/8, fraction: '⅛' },
+        { decimal: 3/8, fraction: '⅜' },
+        { decimal: 5/8, fraction: '⅝' },
+        { decimal: 7/8, fraction: '⅞' },
+        { decimal: 1/6, fraction: '⅙' },
+        { decimal: 5/6, fraction: '⅚' },
+      ];
+      
+      // Check if scaled value is close to a common fraction
+      const wholePart = Math.floor(scaled);
+      const fractionalPart = scaled - wholePart;
+      
+      // First check if the entire scaled value (including whole part) matches a common fraction
+      for (const { decimal, fraction } of commonFractions) {
+        if (Math.abs(scaled - decimal) < tolerance) {
+          return fraction;
         }
       }
       
-      // Round to 2 decimal places and remove trailing zeros
-      return (scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(2).replace(/\.?0+$/, ''));
+      // Then check if just the fractional part matches
+      for (const { decimal, fraction } of commonFractions) {
+        if (Math.abs(fractionalPart - decimal) < tolerance) {
+          return wholePart > 0 ? `${wholePart} ${fraction}` : fraction;
+        }
+      }
+      
+      // If no common fraction matches, try to convert to simple fraction
+      if (fractionalPart > 0) {
+        // Try to find a simple fraction representation
+        for (let denom = 2; denom <= 16; denom++) {
+          const numerator = Math.round(fractionalPart * denom);
+          if (Math.abs(fractionalPart - numerator / denom) < tolerance) {
+            const simplifiedNum = numerator;
+            const simplifiedDenom = denom;
+            
+            // Reduce the fraction
+            const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+            const commonDivisor = gcd(simplifiedNum, simplifiedDenom);
+            const finalNum = simplifiedNum / commonDivisor;
+            const finalDenom = simplifiedDenom / commonDivisor;
+            
+            if (finalDenom !== 1) {
+              return wholePart > 0 ? `${wholePart} ${finalNum}/${finalDenom}` : `${finalNum}/${finalDenom}`;
+            }
+          }
+        }
+      }
+      
+      // For whole numbers
+      if (scaled % 1 === 0) {
+        return scaled.toString();
+      }
+      
+      // If we can't convert to a nice fraction, return as decimal but only as last resort
+      return scaled.toFixed(2).replace(/\.?0+$/, '');
     });
 
     return `${scaledQuantity}${unit ? ' ' + unit : ''} ${name}`;
