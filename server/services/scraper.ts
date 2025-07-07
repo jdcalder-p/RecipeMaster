@@ -89,9 +89,15 @@ export class RecipeScraper {
     }
 
     // Handle case where ingredients are separated by bullet points or dashes
+    // Only split on dashes that appear to be list separators (at the beginning of lines or after whitespace)
     ingredients = ingredients.flatMap((ing: string) => {
-      if (ing.includes('•') || ing.includes('–') || ing.includes('-')) {
-        return ing.split(/[•–-]/).map((item: string) => item.trim()).filter(Boolean);
+      // Split on bullet points or en-dashes
+      if (ing.includes('•') || ing.includes('–')) {
+        return ing.split(/[•–]/).map((item: string) => item.trim()).filter(Boolean);
+      }
+      // Only split on hyphens if they appear to be list separators (start of string or after newline/whitespace)
+      if (ing.includes('-') && /(?:^|\s)-\s/.test(ing)) {
+        return ing.split(/(?:^|\s)-\s/).map((item: string) => item.trim()).filter(Boolean);
       }
       return ing;
     });
