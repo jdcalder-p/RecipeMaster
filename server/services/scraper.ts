@@ -823,6 +823,8 @@ export class RecipeScraper {
     
     // Common patterns for quantity and unit extraction
     const patterns = [
+      // "1 to 2 ozs White Truffle Oil" -> quantity: "1 to 2", unit: "ozs", name: "White Truffle Oil"
+      /^(\d+(?:\.\d+)?(?:\/\d+)?\s+(?:to|-|or)\s+\d+(?:\.\d+)?(?:\/\d+)?)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
       // "4 ozs Sweet Butter" -> quantity: "4", unit: "ozs", name: "Sweet Butter"
       /^(\d+(?:\.\d+)?(?:\/\d+)?)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
       // "1/2 cup sugar" -> quantity: "1/2", unit: "cup", name: "sugar"
@@ -831,8 +833,8 @@ export class RecipeScraper {
       /^(\d+½|\d+¼|\d+¾)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
       // "¼ tsp ground Nutmeg" -> quantity: "¼", unit: "tsp", name: "ground Nutmeg"
       /^(¼|½|¾|\d+¼|\d+½|\d+¾)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
-      // "2-3 apples" -> quantity: "2-3", unit: "", name: "apples"
-      /^(\d+(?:-\d+)?)\s+(.+)$/,
+      // "2 to 3 apples" -> quantity: "2 to 3", unit: "", name: "apples"
+      /^(\d+(?:\s+(?:to|-|or)\s+\d+)?)\s+(.+)$/,
       // "A pinch of salt" -> quantity: "A pinch", unit: "", name: "salt"
       /^(a pinch of|a dash of|a handful of)\s+(.+)$/i,
     ];
@@ -845,8 +847,8 @@ export class RecipeScraper {
       if (match) {
         console.log(`Pattern ${i} matched:`, match);
         
-        // Check if this is a unit-based pattern (first four patterns)
-        if (i < 4 && match.length >= 4) {
+        // Check if this is a unit-based pattern (first five patterns)
+        if (i < 5 && match.length >= 4) {
           // Has explicit unit - standardize it
           const result = {
             quantity: match[1],
