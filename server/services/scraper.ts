@@ -781,6 +781,22 @@ export class RecipeScraper {
     return null;
   }
 
+  private static decodeHtmlEntities(text: string): string {
+    const htmlEntities: { [key: string]: string } = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'",
+      '&nbsp;': ' '
+    };
+    
+    return text.replace(/&[#\w]+;/g, (entity) => {
+      return htmlEntities[entity] || entity;
+    });
+  }
+
   private static parseImage(image: any): string {
     if (typeof image === 'string') return image;
     if (Array.isArray(image) && image.length > 0) {
@@ -876,7 +892,7 @@ export class RecipeScraper {
   }
 
   private static parseIngredientText(ingredientText: string): { name: string; quantity?: string; unit?: string } {
-    const text = ingredientText.trim();
+    const text = this.decodeHtmlEntities(ingredientText.trim());
     
     // Common patterns for quantity and unit extraction
     const patterns = [
@@ -935,7 +951,7 @@ export class RecipeScraper {
     }
 
     // If no pattern matches, return as plain ingredient name
-    const result = { name: text };
+    const result = { name: this.decodeHtmlEntities(text) };
     console.log(`No pattern matched, using plain name:`, result);
     return result;
   }
