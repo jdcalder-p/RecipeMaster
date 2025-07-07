@@ -106,8 +106,9 @@ export class RecipeScraper {
         return ing.split(/[•–]/).map((item: string) => item.trim()).filter(Boolean);
       }
       // Only split on hyphens if they appear to be list separators (start of string or after newline/whitespace)
-      if (ing.includes('-') && /(?:^|\s)-\s/.test(ing)) {
-        return ing.split(/(?:^|\s)-\s/).map((item: string) => item.trim()).filter(Boolean);
+      // Don't split if the dash is in the middle of a word (like "sun-dried")
+      if (ing.includes('-') && /(?:^|\n\s*)-\s/.test(ing)) {
+        return ing.split(/(?:^|\n\s*)-\s/).map((item: string) => item.trim()).filter(Boolean);
       }
       return ing;
     });
@@ -630,8 +631,12 @@ export class RecipeScraper {
           if (ing.includes('\n')) {
             return ing.split('\n').map((item: string) => item.trim()).filter(Boolean);
           }
-          if (ing.includes('•') || ing.includes('–') || ing.includes('- ')) {
-            return ing.split(/[•–]|\s-\s/).map((item: string) => item.trim()).filter(Boolean);
+          if (ing.includes('•') || ing.includes('–')) {
+            return ing.split(/[•–]/).map((item: string) => item.trim()).filter(Boolean);
+          }
+          // Only split on "- " if it appears to be a list separator (at start or after newline)
+          if (/(?:^|\n\s*)-\s/.test(ing)) {
+            return ing.split(/(?:^|\n\s*)-\s/).map((item: string) => item.trim()).filter(Boolean);
           }
           // Split on multiple consecutive spaces or tabs (often used between ingredients)
           if (ing.includes('  ') || ing.includes('\t')) {
