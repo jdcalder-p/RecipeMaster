@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { Clock, Users, Star, Heart, Calendar, Trash2, Archive } from "lucide-react";
+import { Clock, Users, Star, Heart, Calendar, Trash2, Archive, Play } from "lucide-react";
 import { Recipe } from "@shared/schema";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -153,6 +153,13 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
           alt={recipe.title}
           className="w-full h-48 object-cover rounded-t-lg"
         />
+        {recipe.videoUrl && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-black/60 rounded-full p-3 transition-transform hover:scale-110">
+              <Play className="h-8 w-8 text-white fill-current" />
+            </div>
+          </div>
+        )}
         <Button
           variant="ghost"
           size="sm"
