@@ -82,6 +82,14 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
         const wholePart = Math.floor(scaled);
         const fractionalPart = scaled - wholePart;
         
+        // First check if the entire scaled value (including whole part) matches a common fraction
+        for (const { decimal, fraction } of commonFractions) {
+          if (Math.abs(scaled - decimal) < tolerance) {
+            return fraction;
+          }
+        }
+        
+        // Then check if just the fractional part matches
         for (const { decimal, fraction } of commonFractions) {
           if (Math.abs(fractionalPart - decimal) < tolerance) {
             return wholePart > 0 ? `${wholePart} ${fraction}` : fraction;
@@ -110,7 +118,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
           }
         }
         
-        // Fall back to whole number if no fractional part
+        // For whole numbers resulting from fraction scaling
         if (scaled % 1 === 0) {
           return scaled.toString();
         }
