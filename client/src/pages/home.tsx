@@ -134,7 +134,7 @@ export default function Home() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Utensils className="text-primary text-2xl" />
-                <h1 className="text-2xl font-bold text-gray-900">FlavorCraft</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Recipe Master</h1>
               </div>
             </div>
             
