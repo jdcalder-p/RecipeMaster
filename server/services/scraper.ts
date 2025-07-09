@@ -284,6 +284,29 @@ export class RecipeScraper {
         '.recipe-content ol li',
         '.post-content ol li',
         '.content ol li',
+        // Additional selectors for better instruction extraction
+        '.directions p',
+        '.instructions p',
+        '.method p',
+        '.recipe-directions p',
+        '.recipe-instructions p',
+        '.wp-block-recipe-card-course ol li',
+        '.wp-block-recipe-card-instructions ol li',
+        '.entry-content .instructions li',
+        '.entry-content .directions li',
+        '.post-content .instructions li',
+        '.post-content .directions li',
+        // Try broader paragraph searches that might contain numbered steps
+        'p:contains("1.")',
+        'p:contains("Step 1")',
+        'div:contains("1.")',
+        'div:contains("Step 1")',
+        // Look for ordered lists anywhere in content
+        '.entry-content ol > li',
+        '.post-content ol > li',
+        '.content ol > li',
+        'main ol > li',
+        'article ol > li',
       ],
       cookTime: [
         '.recipe-cook-time',
@@ -328,13 +351,85 @@ export class RecipeScraper {
                  text.toLowerCase().includes('heat') ||
                  text.toLowerCase().includes('add') ||
                  text.toLowerCase().includes('stir') ||
-                 text.toLowerCase().includes('season')));
+                 text.toLowerCase().includes('season') ||
+                 text.toLowerCase().includes('place') ||
+                 text.toLowerCase().includes('remove') ||
+                 text.toLowerCase().includes('combine') ||
+                 text.toLowerCase().includes('mix') ||
+                 text.toLowerCase().includes('sauté') ||
+                 text.toLowerCase().includes('simmer') ||
+                 text.toLowerCase().includes('serve')));
       }).map((_, el) => $(el).text().trim()).get();
 
       console.log(`Found ${paragraphInstructions.length} paragraph instructions:`, paragraphInstructions.slice(0, 3));
 
       if (paragraphInstructions.length > instructions.length) {
         instructions = paragraphInstructions;
+      }
+
+      // If still no good instructions, try to extract from any numbered content
+      if (instructions.length < 3) {
+        console.log("Still low count, trying numbered content extraction...");
+        
+        // Look for any element that contains numbered steps
+        const numberedContent = $('*').filter((_, el) => {
+          const text = $(el).text().trim();
+          // Must start with a number and period, and be a reasonable length
+          return /^\d+\.\s*\w/.test(text) && 
+                 text.length > 15 && 
+                 text.length < 1000 &&
+                 !text.toLowerCase().includes('advertisement') &&
+                 !text.toLowerCase().includes('subscribe');
+        }).map((_, el) => $(el).text().trim()).get();
+
+        console.log(`Found ${numberedContent.length} numbered content items:`, numberedContent.slice(0, 3));
+
+        if (numberedContent.length > instructions.length) {
+          instructions = numberedContent;
+        }
+      }
+
+      // Last resort: try to find any text that looks like cooking instructions
+      if (instructions.length < 2) {
+        console.log("Last resort: looking for cooking-related text blocks...");
+        
+        const cookingContent = $('p, div, span').filter((_, el) => {
+          const text = $(el).text().trim();
+          const cookingWords = [
+            'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
+            'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
+            'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread'
+          ];
+          
+          const hasCookingWords = cookingWords.some(word => 
+            text.toLowerCase().includes(word)
+          );
+          
+          return hasCookingWords && 
+                 text.length > 30 && 
+                 text.length < 800 &&
+                 !text.toLowerCase().includes('advertisement') &&
+                 !text.toLowerCase().includes('subscribe') &&
+                 !text.toLowerCase().includes('ingredients');
+        }).map((_, el) => $(el).text().trim()).get();
+
+        // Remove duplicates and sort by relevance
+        const uniqueCookingContent = Array.from(new Set(cookingContent))
+          .filter(text => 
+            // Filter out common non-instruction content
+            !text.toLowerCase().includes('recipe') ||
+            !text.toLowerCase().includes('about') ||
+            text.toLowerCase().includes('cook') ||
+            text.toLowerCase().includes('heat') ||
+            text.toLowerCase().includes('add')
+          )
+          .slice(0, 10); // Limit to reasonable number
+
+        console.log(`Found ${uniqueCookingContent.length} cooking content blocks:`, uniqueCookingContent.slice(0, 3));
+
+        if (uniqueCookingContent.length > instructions.length) {
+          instructions = uniqueCookingContent;
+        }
       }
     }
     const cookTime = this.extractBySelectors($, selectors.cookTime);
