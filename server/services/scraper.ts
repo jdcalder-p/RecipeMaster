@@ -496,63 +496,124 @@ export class RecipeScraper {
             // Look for content in specific Chef Jean Pierre page structure
             const chefJPContent: string[] = [];
             
-            // Try to find the main content area and extract all meaningful paragraphs
-            $('.entry-content, .post-content, .content, .recipe-content, main, article').each((_, container) => {
-              $(container).find('p, li, div').each((_, el) => {
+            // First, try to find the actual recipe instructions in the page content
+            // Look for text patterns that indicate cooking steps
+            $('.entry-content, .post-content, .content, .recipe-content, main, article, .elementor-text-editor').each((_, container) => {
+              console.log(`Checking container: ${$(container).attr('class') || 'no-class'}`);
+              
+              // Look for all text content that might be instructions
+              $(container).find('p, div, span, li, h1, h2, h3, h4, h5, h6, strong, b').each((_, el) => {
                 const $el = $(el);
-                const text = $el.text().trim();
+                let text = $el.text().trim();
                 
-                // Skip if this element contains other elements (likely a container)
-                if ($el.children().length > 0 && !$el.is('li')) return;
+                // Skip if this element has significant child elements (likely a container)
+                const childElements = $el.children().not('span, strong, b, em, i, a');
+                if (childElements.length > 1) return;
                 
-                // Check if this looks like an instruction
-                if (text.length > 15 && text.length < 1500 && 
-                    !text.toLowerCase().includes('advertisement') &&
-                    !text.toLowerCase().includes('subscribe') &&
-                    !text.toLowerCase().includes('comment') &&
-                    !text.toLowerCase().includes('facebook') &&
-                    !text.toLowerCase().includes('twitter') &&
-                    !text.toLowerCase().includes('instagram') &&
-                    !text.toLowerCase().includes('youtube channel') &&
-                    !text.toLowerCase().includes('video recipe') &&
-                    !text.toLowerCase().includes('watch the video') &&
-                    text !== 'Instructions' &&
-                    text !== 'Method' &&
-                    text !== 'Directions') {
+                // Skip very short or very long text
+                if (text.length < 10 || text.length > 2000) return;
+                
+                // Skip common non-instruction content
+                if (text.toLowerCase().includes('advertisement') ||
+                    text.toLowerCase().includes('subscribe') ||
+                    text.toLowerCase().includes('comment') ||
+                    text.toLowerCase().includes('social') ||
+                    text.toLowerCase().includes('facebook') ||
+                    text.toLowerCase().includes('twitter') ||
+                    text.toLowerCase().includes('instagram') ||
+                    text.toLowerCase().includes('youtube channel') ||
+                    text.toLowerCase().includes('follow me') ||
+                    text.toLowerCase().includes('website') ||
+                    text.toLowerCase().includes('click here') ||
+                    text.toLowerCase().includes('video recipe') ||
+                    text.toLowerCase().includes('watch the video') ||
+                    text.toLowerCase().includes('bon appétit') ||
+                    text.toLowerCase().includes('enjoy') && text.length < 50) {
+                  return;
+                }
+                
+                // Clean up the text - remove HTML entities and extra whitespace
+                text = text.replace(/&[#\w]+;/g, ' ')
+                          .replace(/\s+/g, ' ')
+                          .trim();
+                
+                // Look for cooking instruction patterns
+                const cookingIndicators = [
+                  // Action words
+                  'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
+                  'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
+                  'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
+                  'crack', 'beat', 'fold', 'melt', 'warm', 'cool', 'chill', 'drain',
+                  'strain', 'sift', 'knead', 'roll', 'cut', 'trim', 'peel', 'grate',
                   
-                  // Prioritize text that contains cooking-related words
-                  const cookingWords = [
-                    'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
-                    'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
-                    'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
-                    'sauce', 'make', 'prepare', 'until', 'minutes', 'degrees', 'temperature',
-                    'pan', 'pot', 'bowl', 'oven', 'stove', 'flame', 'medium', 'high', 'low',
-                    'tender', 'golden', 'brown', 'crispy', 'melted', 'dissolved'
-                  ];
+                  // Cooking terms
+                  'sauce', 'make', 'prepare', 'until', 'minutes', 'degrees', 'temperature',
+                  'pan', 'pot', 'bowl', 'oven', 'stove', 'flame', 'medium', 'high', 'low',
+                  'tender', 'golden', 'brown', 'crispy', 'melted', 'dissolved', 'bubbling',
+                  'simmering', 'steaming', 'smoking', 'caramelized',
                   
-                  const hasCookingWords = cookingWords.some(word => 
-                    text.toLowerCase().includes(word)
-                  );
+                  // Timing and sequence words
+                  'first', 'then', 'next', 'after', 'before', 'while', 'during', 'finally',
+                  'meanwhile', 'simultaneously', 'gradually', 'slowly', 'quickly',
                   
-                  if (hasCookingWords || 
-                      /^\d+\./.test(text) || 
-                      /^step \d+/i.test(text) ||
-                      text.toLowerCase().includes('first') ||
-                      text.toLowerCase().includes('then') ||
-                      text.toLowerCase().includes('next') ||
-                      text.toLowerCase().includes('finally')) {
-                    chefJPContent.push(text);
-                  }
+                  // Cooking equipment and techniques
+                  'whisk', 'spatula', 'ladle', 'tongs', 'thermometer', 'timer',
+                  'refrigerate', 'freeze', 'thaw', 'marinate', 'rest'
+                ];
+                
+                const hasCookingIndicators = cookingIndicators.some(word => 
+                  text.toLowerCase().includes(word)
+                );
+                
+                // Check for numbered steps or sequence indicators
+                const isNumberedStep = /^\d+[\.\)\-\:]/.test(text) || 
+                                      /^step \d+/i.test(text);
+                
+                // Check for common instruction sentence structures
+                const isInstructionStructure = 
+                  // Starts with imperative verbs
+                  /^(heat|cook|bake|add|mix|stir|place|remove|season|serve|prepare|make|cut|chop|slice|pour|beat|whisk|combine|fold|melt|warm|cool|drain|sift)/i.test(text) ||
+                  // Contains instructional phrases
+                  /\b(you will|you need to|make sure|be sure to|don't forget|remember to)\b/i.test(text) ||
+                  // Contains timing information
+                  /\b(\d+\s*minutes?|\d+\s*hours?|\d+\s*seconds?|until\s+\w+)\b/i.test(text);
+                
+                // Additional context clues
+                const hasTemperature = /\b\d+\s*degrees?\b/i.test(text);
+                const hasMeasurement = /\b\d+\s*(cup|cups|tbsp|tsp|oz|lb|gram|ml|liter)\b/i.test(text);
+                const hasTimeReference = /\b(\d+\s*min|minutes?|hours?|seconds?|until|while|during)\b/i.test(text);
+                
+                // Score the text based on how likely it is to be an instruction
+                let score = 0;
+                if (hasCookingIndicators) score += 2;
+                if (isNumberedStep) score += 3;
+                if (isInstructionStructure) score += 2;
+                if (hasTemperature) score += 1;
+                if (hasMeasurement) score += 1;
+                if (hasTimeReference) score += 1;
+                if (text.length > 30 && text.length < 500) score += 1;
+                
+                // If the text scores high enough, consider it an instruction
+                if (score >= 3 || (score >= 2 && text.length > 50)) {
+                  console.log(`Found potential instruction (score: ${score}): "${text.substring(0, 100)}..."`);
+                  chefJPContent.push(text);
                 }
               });
             });
             
-            // Remove duplicates and sort by likely instruction order
+            // Remove duplicates and filter out low-quality content
             const uniqueChefJPContent = Array.from(new Set(chefJPContent))
-              .filter(text => text.length > 10)
-              .slice(0, 20);
+              .filter(text => {
+                // Final quality check
+                return text.length > 20 && 
+                       text.length < 1000 &&
+                       !text.match(/^(ingredients?|instruction|method|directions?|recipe|about|share|follow):?$/i) &&
+                       !text.toLowerCase().includes('makes 1') &&
+                       !text.toLowerCase().includes('serving') && text.length < 100;
+              })
+              .slice(0, 15); // Keep reasonable number
             
-            console.log(`Found ${uniqueChefJPContent.length} Chef Jean Pierre specific content blocks:`, uniqueChefJPContent.slice(0, 5));
+            console.log(`Found ${uniqueChefJPContent.length} Chef Jean Pierre specific content blocks:`, uniqueChefJPContent);
             
             if (uniqueChefJPContent.length > instructions.length) {
               instructions = uniqueChefJPContent;
