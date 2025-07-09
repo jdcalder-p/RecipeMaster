@@ -203,8 +203,8 @@ export class RecipeScraper {
     );
 
     const finalInstructions = hasValidInstructions 
-      ? processedInstructions.map(text => ({ text }))
-      : [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }];
+      ? [{ steps: processedInstructions.map(text => ({ text })) }]
+      : [{ steps: [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }] }];
 
     return {
       title: recipe.name || '',
