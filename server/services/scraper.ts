@@ -307,6 +307,20 @@ export class RecipeScraper {
         '.content ol > li',
         'main ol > li',
         'article ol > li',
+        // Chef Jean Pierre specific selectors
+        '.wp-block-list li',
+        '.wp-block-group li',
+        '.post-body ol li',
+        '.post-body ul li',
+        '.recipe-content ul li',
+        '.recipe-content div p',
+        '.entry-content div p',
+        '.post-content div p',
+        // Look for paragraphs that might contain step-by-step instructions
+        '.entry-content p:contains("1.")',
+        '.post-content p:contains("1.")',
+        '.entry-content p:contains("Step")',
+        '.post-content p:contains("Step")',
       ],
       cookTime: [
         '.recipe-cook-time',
@@ -475,42 +489,115 @@ export class RecipeScraper {
         
         // If still no good content, try the broader search
         if (instructions.length < 2) {
-          const cookingContent = $('p, div, span, li').filter((_, el) => {
-            const text = $(el).text().trim();
-            const cookingWords = [
-              'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
-              'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
-              'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
-              'sauce', 'make', 'prepare', 'until', 'minutes', 'degrees'
-            ];
+          // First try to find content specifically for Chef Jean Pierre's website
+          if (url && url.includes('chefjeanpierre.com')) {
+            console.log("Detected Chef Jean Pierre website, using specialized extraction...");
             
-            const hasCookingWords = cookingWords.some(word => 
-              text.toLowerCase().includes(word)
-            );
+            // Look for content in specific Chef Jean Pierre page structure
+            const chefJPContent: string[] = [];
             
-            return hasCookingWords && 
-                   text.length > 20 && 
-                   text.length < 1000 &&
-                   !text.toLowerCase().includes('advertisement') &&
-                   !text.toLowerCase().includes('subscribe') &&
-                   !text.toLowerCase().includes('nutrition') &&
-                   !text.toLowerCase().includes('calories');
-          }).map((_, el) => $(el).text().trim()).get();
+            // Try to find the main content area and extract all meaningful paragraphs
+            $('.entry-content, .post-content, .content, .recipe-content, main, article').each((_, container) => {
+              $(container).find('p, li, div').each((_, el) => {
+                const $el = $(el);
+                const text = $el.text().trim();
+                
+                // Skip if this element contains other elements (likely a container)
+                if ($el.children().length > 0 && !$el.is('li')) return;
+                
+                // Check if this looks like an instruction
+                if (text.length > 15 && text.length < 1500 && 
+                    !text.toLowerCase().includes('advertisement') &&
+                    !text.toLowerCase().includes('subscribe') &&
+                    !text.toLowerCase().includes('comment') &&
+                    !text.toLowerCase().includes('facebook') &&
+                    !text.toLowerCase().includes('twitter') &&
+                    !text.toLowerCase().includes('instagram') &&
+                    !text.toLowerCase().includes('youtube channel') &&
+                    !text.toLowerCase().includes('video recipe') &&
+                    !text.toLowerCase().includes('watch the video') &&
+                    text !== 'Instructions' &&
+                    text !== 'Method' &&
+                    text !== 'Directions') {
+                  
+                  // Prioritize text that contains cooking-related words
+                  const cookingWords = [
+                    'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
+                    'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
+                    'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
+                    'sauce', 'make', 'prepare', 'until', 'minutes', 'degrees', 'temperature',
+                    'pan', 'pot', 'bowl', 'oven', 'stove', 'flame', 'medium', 'high', 'low',
+                    'tender', 'golden', 'brown', 'crispy', 'melted', 'dissolved'
+                  ];
+                  
+                  const hasCookingWords = cookingWords.some(word => 
+                    text.toLowerCase().includes(word)
+                  );
+                  
+                  if (hasCookingWords || 
+                      /^\d+\./.test(text) || 
+                      /^step \d+/i.test(text) ||
+                      text.toLowerCase().includes('first') ||
+                      text.toLowerCase().includes('then') ||
+                      text.toLowerCase().includes('next') ||
+                      text.toLowerCase().includes('finally')) {
+                    chefJPContent.push(text);
+                  }
+                }
+              });
+            });
+            
+            // Remove duplicates and sort by likely instruction order
+            const uniqueChefJPContent = Array.from(new Set(chefJPContent))
+              .filter(text => text.length > 10)
+              .slice(0, 20);
+            
+            console.log(`Found ${uniqueChefJPContent.length} Chef Jean Pierre specific content blocks:`, uniqueChefJPContent.slice(0, 5));
+            
+            if (uniqueChefJPContent.length > instructions.length) {
+              instructions = uniqueChefJPContent;
+            }
+          }
+          
+          // If still no good content, try the general broader search
+          if (instructions.length < 2) {
+            const cookingContent = $('p, div, span, li').filter((_, el) => {
+              const text = $(el).text().trim();
+              const cookingWords = [
+                'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
+                'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
+                'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
+                'sauce', 'make', 'prepare', 'until', 'minutes', 'degrees'
+              ];
+              
+              const hasCookingWords = cookingWords.some(word => 
+                text.toLowerCase().includes(word)
+              );
+              
+              return hasCookingWords && 
+                     text.length > 30 && 
+                     text.length < 1000 &&
+                     !text.toLowerCase().includes('advertisement') &&
+                     !text.toLowerCase().includes('subscribe') &&
+                     !text.toLowerCase().includes('nutrition') &&
+                     !text.toLowerCase().includes('calories');
+            }).map((_, el) => $(el).text().trim()).get();
 
-          // Remove duplicates and sort by relevance
-          const uniqueCookingContent = Array.from(new Set(cookingContent))
-            .filter(text => 
-              // Filter out common non-instruction content
-              text.length > 20 &&
-              !(text.toLowerCase().includes('recipe') && text.length < 100) &&
-              !(text.toLowerCase().includes('about') && text.length < 100)
-            )
-            .slice(0, 15); // Increase limit
+            // Remove duplicates and sort by relevance
+            const uniqueCookingContent = Array.from(new Set(cookingContent))
+              .filter(text => 
+                // Filter out common non-instruction content
+                text.length > 30 &&
+                !(text.toLowerCase().includes('recipe') && text.length < 100) &&
+                !(text.toLowerCase().includes('about') && text.length < 100)
+              )
+              .slice(0, 15); // Increase limit
 
-          console.log(`Found ${uniqueCookingContent.length} cooking content blocks:`, uniqueCookingContent.slice(0, 5));
+            console.log(`Found ${uniqueCookingContent.length} cooking content blocks:`, uniqueCookingContent.slice(0, 5));
 
-          if (uniqueCookingContent.length > instructions.length) {
-            instructions = uniqueCookingContent;
+            if (uniqueCookingContent.length > instructions.length) {
+              instructions = uniqueCookingContent;
+            }
           }
         }
       }
