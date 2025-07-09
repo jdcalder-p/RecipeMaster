@@ -393,42 +393,125 @@ export class RecipeScraper {
       if (instructions.length < 2) {
         console.log("Last resort: looking for cooking-related text blocks...");
         
-        const cookingContent = $('p, div, span').filter((_, el) => {
-          const text = $(el).text().trim();
-          const cookingWords = [
-            'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
-            'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
-            'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread'
-          ];
+        // First, try to find content with section headers like "make the sauce"
+        const sectionBasedInstructions: string[] = [];
+        
+        // Look for headings that might indicate instruction sections
+        $('h1, h2, h3, h4, h5, h6, strong, b, .heading, .title, .section-title').each((_, el) => {
+          const $heading = $(el);
+          const headingText = $heading.text().trim().toLowerCase();
           
-          const hasCookingWords = cookingWords.some(word => 
-            text.toLowerCase().includes(word)
-          );
-          
-          return hasCookingWords && 
-                 text.length > 30 && 
-                 text.length < 800 &&
-                 !text.toLowerCase().includes('advertisement') &&
-                 !text.toLowerCase().includes('subscribe') &&
-                 !text.toLowerCase().includes('ingredients');
-        }).map((_, el) => $(el).text().trim()).get();
+          // Check if this looks like an instruction section
+          if (headingText.includes('sauce') || 
+              headingText.includes('preparation') || 
+              headingText.includes('instructions') || 
+              headingText.includes('method') || 
+              headingText.includes('directions') || 
+              headingText.includes('steps') ||
+              headingText.includes('make') ||
+              headingText.includes('prepare') ||
+              headingText.includes('cook') ||
+              /step \d+/i.test(headingText)) {
+            
+            console.log(`Found potential instruction section: "${headingText}"`);
+            
+            // Add the section header
+            sectionBasedInstructions.push($heading.text().trim());
+            
+            // Look for content following this heading
+            let $next = $heading.next();
+            let attempts = 0;
+            
+            while ($next.length && attempts < 10) {
+              attempts++;
+              const nextText = $next.text().trim();
+              
+              // Stop if we hit another heading
+              if ($next.is('h1, h2, h3, h4, h5, h6, .heading, .title, .section-title') && 
+                  nextText.length > 0) {
+                break;
+              }
+              
+              // If this element contains cooking instructions
+              if (nextText.length > 20 && nextText.length < 1000) {
+                const cookingWords = [
+                  'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
+                  'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
+                  'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
+                  'until', 'minutes', 'degrees', 'temperature'
+                ];
+                
+                const hasCookingWords = cookingWords.some(word => 
+                  nextText.toLowerCase().includes(word)
+                );
+                
+                if (hasCookingWords && 
+                    !nextText.toLowerCase().includes('advertisement') &&
+                    !nextText.toLowerCase().includes('subscribe')) {
+                  sectionBasedInstructions.push(nextText);
+                }
+              }
+              
+              // If this is a list, extract all list items
+              if ($next.is('ul, ol')) {
+                $next.find('li').each((_, li) => {
+                  const liText = $(li).text().trim();
+                  if (liText.length > 15 && liText.length < 800) {
+                    sectionBasedInstructions.push(liText);
+                  }
+                });
+              }
+              
+              $next = $next.next();
+            }
+          }
+        });
+        
+        console.log(`Found ${sectionBasedInstructions.length} section-based instructions:`, sectionBasedInstructions.slice(0, 5));
+        
+        if (sectionBasedInstructions.length > instructions.length) {
+          instructions = sectionBasedInstructions;
+        }
+        
+        // If still no good content, try the broader search
+        if (instructions.length < 2) {
+          const cookingContent = $('p, div, span, li').filter((_, el) => {
+            const text = $(el).text().trim();
+            const cookingWords = [
+              'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
+              'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
+              'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
+              'sauce', 'make', 'prepare', 'until', 'minutes', 'degrees'
+            ];
+            
+            const hasCookingWords = cookingWords.some(word => 
+              text.toLowerCase().includes(word)
+            );
+            
+            return hasCookingWords && 
+                   text.length > 20 && 
+                   text.length < 1000 &&
+                   !text.toLowerCase().includes('advertisement') &&
+                   !text.toLowerCase().includes('subscribe') &&
+                   !text.toLowerCase().includes('nutrition') &&
+                   !text.toLowerCase().includes('calories');
+          }).map((_, el) => $(el).text().trim()).get();
 
-        // Remove duplicates and sort by relevance
-        const uniqueCookingContent = Array.from(new Set(cookingContent))
-          .filter(text => 
-            // Filter out common non-instruction content
-            !text.toLowerCase().includes('recipe') ||
-            !text.toLowerCase().includes('about') ||
-            text.toLowerCase().includes('cook') ||
-            text.toLowerCase().includes('heat') ||
-            text.toLowerCase().includes('add')
-          )
-          .slice(0, 10); // Limit to reasonable number
+          // Remove duplicates and sort by relevance
+          const uniqueCookingContent = Array.from(new Set(cookingContent))
+            .filter(text => 
+              // Filter out common non-instruction content
+              text.length > 20 &&
+              !(text.toLowerCase().includes('recipe') && text.length < 100) &&
+              !(text.toLowerCase().includes('about') && text.length < 100)
+            )
+            .slice(0, 15); // Increase limit
 
-        console.log(`Found ${uniqueCookingContent.length} cooking content blocks:`, uniqueCookingContent.slice(0, 3));
+          console.log(`Found ${uniqueCookingContent.length} cooking content blocks:`, uniqueCookingContent.slice(0, 5));
 
-        if (uniqueCookingContent.length > instructions.length) {
-          instructions = uniqueCookingContent;
+          if (uniqueCookingContent.length > instructions.length) {
+            instructions = uniqueCookingContent;
+          }
         }
       }
     }
