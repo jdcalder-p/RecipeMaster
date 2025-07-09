@@ -194,13 +194,25 @@ export class RecipeScraper {
       ];
     }
 
+    // If instructions are empty or only contain section headers, create a fallback
+    const processedInstructions = instructions.filter(Boolean);
+    const hasValidInstructions = processedInstructions.some(inst => 
+      inst.length > 15 && 
+      !inst.endsWith(':') && 
+      !inst.match(/^(step \d+|make the|cook the|prepare the|for the):?$/i)
+    );
+
+    const finalInstructions = hasValidInstructions 
+      ? processedInstructions.map(text => ({ text }))
+      : [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }];
+
     return {
       title: recipe.name || '',
       description: recipe.description || '',
       cookTime,
       servings,
       ingredients: structuredIngredients,
-      instructions: instructions.filter(Boolean).map(text => ({ text })),
+      instructions: finalInstructions,
       imageUrl: this.parseImage(recipe.image),
       category: this.parseCategory(recipe.recipeCategory),
       videoUrl: recipe.video?.contentUrl || recipe.video?.embedUrl || '',
@@ -349,7 +361,7 @@ export class RecipeScraper {
     // Convert instructions to sections format
     const instructionSections = instructionsWithImages.length > 0 
       ? [{ steps: instructionsWithImages }]
-      : [{ steps: [{ text: "No instructions found" }] }];
+      : [{ steps: [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }] }];
 
     return {
       title,
@@ -599,11 +611,14 @@ export class RecipeScraper {
         });
 
         // Filter out very short instructions that are likely not actual steps
+        // Also filter out section headers that end with a colon and are very short
         const filteredInstructions = instructions.filter(inst => 
-          inst.length > 10 && 
+          inst.length > 15 && 
           inst.length < 1000 && 
           !inst.toLowerCase().includes('advertisement') &&
-          !inst.toLowerCase().includes('subscribe')
+          !inst.toLowerCase().includes('subscribe') &&
+          !(inst.endsWith(':') && inst.length < 50) && // Filter out section headers
+          !inst.match(/^(step \d+|make the|cook the|prepare the|for the):?$/i) // Filter out common headers
         );
 
         console.log(`Filtered to ${filteredInstructions.length} instructions from selector "${selector}":`, filteredInstructions.slice(0, 3));
@@ -615,7 +630,36 @@ export class RecipeScraper {
       }
     }
 
-    console.log(`No instructions found with any selector`);
+    // If no good instructions found, try a broader search for paragraphs with cooking content
+    console.log(`No instructions found with selectors, trying broader paragraph search...`);
+    
+    const paragraphs = $('p, div').filter((_, el) => {
+      const text = $(el).text().trim();
+      // Look for cooking-related content that's substantial
+      return text.length > 20 && text.length < 1000 && 
+             !text.endsWith(':') && // Not a header
+             (text.toLowerCase().includes('heat') || 
+              text.toLowerCase().includes('cook') || 
+              text.toLowerCase().includes('add') ||
+              text.toLowerCase().includes('season') ||
+              text.toLowerCase().includes('stir') ||
+              text.toLowerCase().includes('bake') ||
+              text.toLowerCase().includes('sauté') ||
+              text.toLowerCase().includes('simmer') ||
+              text.toLowerCase().includes('serve') ||
+              text.toLowerCase().includes('place') ||
+              text.toLowerCase().includes('remove') ||
+              text.toLowerCase().includes('combine') ||
+              text.toLowerCase().includes('mix') ||
+              text.toLowerCase().includes('until'));
+    }).map((_, el) => $(el).text().trim()).get();
+
+    if (paragraphs.length > 0) {
+      console.log(`Found ${paragraphs.length} instruction paragraphs:`, paragraphs.slice(0, 3));
+      return paragraphs;
+    }
+
+    console.log(`No instructions found with any method`);
     return [];
   }
 
