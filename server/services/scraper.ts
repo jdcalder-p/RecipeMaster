@@ -31,7 +31,7 @@ export class RecipeScraper {
       });
 
       const $ = cheerio.load(response.data);
-      
+
       // Try JSON-LD structured data first
       console.log(`🔍 SCRAPING: Starting recipe scrape for: ${url}`);
       console.log(`📄 SCRAPING: Trying JSON-LD extraction...`);
@@ -40,7 +40,7 @@ export class RecipeScraper {
         console.log(`✅ SCRAPING: JSON-LD extraction successful, found recipe data`);
         console.log(`📊 JSON-LD INSTRUCTIONS COUNT:`, jsonLd.instructions?.length || 0);
         console.log(`📊 JSON-LD FIRST 3 INSTRUCTIONS:`, jsonLd.instructions?.slice(0, 3));
-        
+
         // If no video URL found in JSON-LD, try manual extraction
         if (!jsonLd.videoUrl) {
           const videoUrl = this.extractVideoUrl($);
@@ -49,7 +49,7 @@ export class RecipeScraper {
             console.log(`📹 SCRAPING: Found video URL via manual extraction: ${videoUrl}`);
           }
         }
-        
+
         return jsonLd;
       }
 
@@ -67,16 +67,16 @@ export class RecipeScraper {
 
   private static extractJsonLd($: cheerio.CheerioAPI, url: string): Partial<InsertRecipe> | null {
     const scripts = $('script[type="application/ld+json"]');
-    
+
     for (let i = 0; i < scripts.length; i++) {
       try {
         const jsonText = $(scripts[i]).html();
         if (!jsonText) continue;
-        
+
         const json = JSON.parse(jsonText);
         const recipe = Array.isArray(json) ? json.find(item => item['@type'] === 'Recipe') : 
                       json['@type'] === 'Recipe' ? json : null;
-        
+
         if (recipe) {
           return this.parseJsonLdRecipe(recipe, url);
         }
@@ -84,7 +84,7 @@ export class RecipeScraper {
         continue;
       }
     }
-    
+
     return null;
   }
 
@@ -114,10 +114,10 @@ export class RecipeScraper {
     });
 
     const instructions = this.parseInstructions(recipe.recipeInstructions || []);
-    
+
     const cookTime = this.parseDuration(recipe.cookTime || recipe.totalTime);
     let servings = this.parseServings(recipe.recipeYield);
-    
+
     // If servings is 1 (default), try to extract from instructions or description
     if (servings === 1) {
       const allText = [
@@ -125,7 +125,7 @@ export class RecipeScraper {
         ...(instructions || []),
         recipe.name || ''
       ].join(' ');
-      
+
       const extractedServings = this.extractServingsFromText(allText);
       if (extractedServings) {
         servings = extractedServings;
@@ -210,7 +210,7 @@ export class RecipeScraper {
   private static extractManually($: cheerio.CheerioAPI, url: string): Partial<InsertRecipe> {
     // Try to extract ingredients with sections first
     const ingredientsWithSections = this.extractIngredientsWithSections($, url);
-    
+
     // Common recipe site patterns
     const selectors = {
       title: [
@@ -299,11 +299,11 @@ export class RecipeScraper {
     let instructions = this.extractInstructionsBySelectors($, selectors.instructions);
     console.log(`=== INSTRUCTION EXTRACTION DEBUG ===`);
     console.log(`Found ${instructions.length} instructions using selectors:`, instructions.slice(0, 5));
-    
+
     // If we didn't find many instructions, try broader searches
     if (instructions.length < 3) {
       console.log("Low instruction count, trying broader search...");
-      
+
       // Try to find instruction content in paragraphs or divs
       const paragraphInstructions = $('p, div').filter((_, el) => {
         const text = $(el).text().trim();
@@ -318,16 +318,16 @@ export class RecipeScraper {
                  text.toLowerCase().includes('stir') ||
                  text.toLowerCase().includes('season')));
       }).map((_, el) => $(el).text().trim()).get();
-      
+
       console.log(`Found ${paragraphInstructions.length} paragraph instructions:`, paragraphInstructions.slice(0, 3));
-      
+
       if (paragraphInstructions.length > instructions.length) {
         instructions = paragraphInstructions;
       }
     }
     const cookTime = this.extractBySelectors($, selectors.cookTime);
     let servings = this.parseServings(this.extractBySelectors($, selectors.servings));
-    
+
     // If servings is 1 (default), try to extract from page content
     if (servings === 1) {
       const allText = [
@@ -336,32 +336,35 @@ export class RecipeScraper {
         ...instructions,
         $('body').text()
       ].join(' ');
-      
+
       const extractedServings = this.extractServingsFromText(allText);
       if (extractedServings) {
         servings = extractedServings;
       }
     }
-    
+
     const imageUrl = this.extractImageBySelectors($, selectors.image, url);
     const videoUrl = RecipeScraper.extractVideoUrl($);
+    const instructionsWithImages = RecipeScraper.extractInstructionsWithImages($, instructions, url);
+    // Convert instructions to sections format
+    const instructionSections = instructionsWithImages.length > 0 
+      ? [{ steps: instructionsWithImages }]
+      : [{ steps: [{ text: "No instructions found" }] }];
 
     return {
-      title: title || 'Imported Recipe',
+      title,
       description,
-      cookTime,
-      servings,
-      ingredients: ingredientsWithSections.length > 0 
-        ? ingredientsWithSections 
-        : ingredients.filter(Boolean).length > 0 
-          ? [{ items: ingredients.filter(Boolean).map((ing: any) => {
+      ingredients: ingredientsWithSections.length > 0 ? ingredientsWithSections : ingredients.filter(Boolean).length > 0 
+        ? [{ items: ingredients.filter(Boolean).map((ing: any) => {
               const parsed = this.parseIngredientText(ing);
               // Capitalize the first letter of ingredient name
               parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
               return parsed;
             }) }]
           : [],
-      instructions: RecipeScraper.extractInstructionsWithImages($, instructions, url),
+      instructions: instructionSections,
+      cookTime,
+      servings,
       imageUrl,
       videoUrl,
     };
@@ -369,21 +372,21 @@ export class RecipeScraper {
 
   private static extractInstructionsWithImages($: cheerio.CheerioAPI, instructions: string[], baseUrl: string): Array<{ text: string; imageUrl?: string }> {
     console.log(`Extracting images for ${instructions.length} instructions`);
-    
+
     return instructions.filter(Boolean).map((text, index) => {
       let imageUrl: string | undefined;
-      
+
       // Try to find an image associated with this instruction step
       // Look for images near instruction elements that might correspond to this step
       const stepNumber = index + 1;
-      
+
       // Common patterns for instruction images
       const imageSelectors = [
         // Look for images with step numbers in class names or data attributes
         `.step-${stepNumber} img`,
         `[data-step="${stepNumber}"] img`,
         `.instruction-${stepNumber} img`,
-        
+
         // Look for images in recipe instruction containers
         '.wprm-recipe-instruction img',
         '.recipe-instruction img',
@@ -391,25 +394,25 @@ export class RecipeScraper {
         '.method img',
         '.steps img',
         '.directions img',
-        
+
         // Look for images in recipe content sections
         '.recipe-content img',
         '.post-content img',
         '.entry-content img',
         '.content img',
-        
+
         // Look for images in figure elements
         'figure img',
         '.wp-block-image img',
         '.wp-block-gallery img',
-        
+
         // Look for images with cooking-related alt text
         'img[alt*="step"]',
         'img[alt*="cooking"]',
         'img[alt*="recipe"]',
         'img[alt*="instruction"]',
       ];
-      
+
       // Try to find an image for this specific step
       for (const selector of imageSelectors) {
         const images = $(selector);
@@ -423,7 +426,7 @@ export class RecipeScraper {
           }
         }
       }
-      
+
       // If no specific image found, try to find any image in the content
       if (!imageUrl) {
         const allImages = $('.recipe-content img, .post-content img, .entry-content img, .content img');
@@ -436,7 +439,7 @@ export class RecipeScraper {
           }
         }
       }
-      
+
       return { text, imageUrl };
     });
   }
@@ -459,20 +462,20 @@ export class RecipeScraper {
       $(sectionSelector).each((_, element) => {
         const $section = $(element);
         const sectionTitle = $section.text().trim();
-        
+
         // Look for ingredient patterns in the section title - expanded list
         const isIngredientSection = /ingredient|paste|dough|filling|icing|frosting|topping|sauce|marinade|coating|batter|roll|cinnamon|for the|glaze|syrup|mixture|base|cream|cheese/i.test(sectionTitle);
-        
+
         if (isIngredientSection) {
           const ingredients: Array<{ name: string; quantity?: string; unit?: string; }> = [];
-          
+
           // Look for ingredient lists following this heading
           let nextElement = $section.next();
           let attempts = 0;
-          
+
           while (nextElement.length && attempts < 5) {
             attempts++;
-            
+
             if (nextElement.is('ul, ol')) {
               nextElement.find('li').each((_, li) => {
                 const text = $(li).text().trim();
@@ -490,10 +493,10 @@ export class RecipeScraper {
               parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
               ingredients.push(parsed);
             }
-            
+
             nextElement = nextElement.next();
           }
-          
+
           if (ingredients.length > 0) {
             sections.push({
               sectionName: sectionTitle,
@@ -558,7 +561,7 @@ export class RecipeScraper {
     // Check if text looks like an ingredient (contains measurements, common ingredient words)
     const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b)\b/i;
     const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese)\b/i;
-    
+
     return measurementPattern.test(text) || ingredientWords.test(text);
   }
 
@@ -574,18 +577,18 @@ export class RecipeScraper {
 
   private static extractInstructionsBySelectors($: cheerio.CheerioAPI, selectors: string[]): string[] {
     console.log(`Starting instruction extraction with ${selectors.length} selectors`);
-    
+
     for (let i = 0; i < selectors.length; i++) {
       const selector = selectors[i];
       console.log(`Trying selector ${i + 1}/${selectors.length}: "${selector}"`);
-      
+
       const elements = $(selector);
       console.log(`Found ${elements.length} elements for selector: ${selector}`);
-      
+
       if (elements.length > 0) {
         let instructions = elements.map((_, el) => $(el).text().trim()).get();
         console.log(`Raw instructions from selector "${selector}":`, instructions.slice(0, 3));
-        
+
         // Handle case where instructions might be concatenated in a single element
         instructions = instructions.flatMap((inst: string) => {
           // Split on common separators used in instruction lists
@@ -594,7 +597,7 @@ export class RecipeScraper {
           }
           return inst;
         });
-        
+
         // Filter out very short instructions that are likely not actual steps
         const filteredInstructions = instructions.filter(inst => 
           inst.length > 10 && 
@@ -602,16 +605,16 @@ export class RecipeScraper {
           !inst.toLowerCase().includes('advertisement') &&
           !inst.toLowerCase().includes('subscribe')
         );
-        
+
         console.log(`Filtered to ${filteredInstructions.length} instructions from selector "${selector}":`, filteredInstructions.slice(0, 3));
-        
+
         if (filteredInstructions.length > 0) {
           console.log(`SUCCESS: Using ${filteredInstructions.length} instructions from selector: ${selector}`);
           return filteredInstructions;
         }
       }
     }
-    
+
     console.log(`No instructions found with any selector`);
     return [];
   }
@@ -624,7 +627,7 @@ export class RecipeScraper {
       console.log(`Found ${elements.length} elements with selector: ${selector}`);
       if (elements.length) {
         let ingredients = elements.map((_, el) => $(el).text().trim()).get();
-        
+
         // Handle case where ingredients might be concatenated in a single element
         ingredients = ingredients.flatMap((ing: string) => {
           // Split on common separators used in ingredient lists
@@ -644,10 +647,10 @@ export class RecipeScraper {
           }
           return ing;
         });
-        
+
         // Filter ingredients to only include ones that look like ingredients (contain common measurements)
         const measurementPattern = /\b(\d+\/?\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?)\b/i;
-        
+
         const filteredIngredients = ingredients.filter(ing => {
           const text = ing.toLowerCase();
           // Keep if it contains measurements or common ingredient words
@@ -657,20 +660,20 @@ export class RecipeScraper {
                  text.includes('milk') || text.includes('water') || text.includes('oil') ||
                  text.includes('yeast') || text.includes('vanilla') || text.includes('cinnamon');
         });
-        
+
         if (filteredIngredients.length > 0) {
           return filteredIngredients;
         }
-        
+
         // If filtered list is empty, return all ingredients (some recipes might not have standard measurements)
         return ingredients.filter(Boolean);
       }
     }
-    
+
     // Last resort: try to extract from the entire page content
     const allText = $('body').text();
     const lines = allText.split('\n').map(line => line.trim()).filter(Boolean);
-    
+
     const ingredientLines = lines.filter(line => {
       const text = line.toLowerCase();
       // Look for lines that seem like ingredients
@@ -679,7 +682,7 @@ export class RecipeScraper {
              (text.includes('tbsp') && text.length < 100) ||
              (text.includes('tsp') && text.length < 100);
     });
-    
+
     return ingredientLines.slice(0, 20); // Limit to reasonable number
   }
 
@@ -707,19 +710,19 @@ export class RecipeScraper {
         if (src && (src.includes('youtube') || src.includes('vimeo') || src.includes('dailymotion'))) {
           return src.startsWith('//') ? `https:${src}` : src;
         }
-        
+
         // For links, get href attribute
         const href = element.attr('href');
         if (href && (href.includes('youtube') || href.includes('youtu.be') || href.includes('vimeo'))) {
           return href;
         }
-        
+
         // For data attributes
         const dataUrl = element.attr('data-video-url');
         if (dataUrl) return dataUrl;
       }
     }
-    
+
     return '';
   }
 
@@ -746,13 +749,13 @@ export class RecipeScraper {
 
     // Remove duplicates by converting to Set and back to array
     const uniqueInstructions = Array.from(new Set(parsedInstructions));
-    
+
     return uniqueInstructions;
   }
 
   private static parseDuration(duration: string): string {
     if (!duration) return '';
-    
+
     // Parse ISO 8601 duration (PT30M) or simple text
     const isoMatch = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
     if (isoMatch) {
@@ -763,7 +766,7 @@ export class RecipeScraper {
       }
       return `${minutes} min`;
     }
-    
+
     return duration;
   }
 
@@ -778,7 +781,7 @@ export class RecipeScraper {
 
   private static extractServingsFromText(text: string): number | null {
     if (!text) return null;
-    
+
     // Look for serving patterns in text
     const servingPatterns = [
       /makes?\s+(\d+)\s+servings?/i,
@@ -788,7 +791,7 @@ export class RecipeScraper {
       /portions?\s*:?\s*(\d+)/i,
       /recipe\s+makes?\s+(\d+)/i,
     ];
-    
+
     for (const pattern of servingPatterns) {
       const match = text.match(pattern);
       if (match) {
@@ -799,7 +802,7 @@ export class RecipeScraper {
         }
       }
     }
-    
+
     return null;
   }
 
@@ -813,7 +816,7 @@ export class RecipeScraper {
       '&apos;': "'",
       '&nbsp;': ' '
     };
-    
+
     return text.replace(/&[#\w]+;/g, (entity) => {
       return htmlEntities[entity] || entity;
     });
@@ -838,43 +841,43 @@ export class RecipeScraper {
 
   private static standardizeUnit(unit: string): string {
     const unitLower = unit.toLowerCase();
-    
+
     // Standardize units according to user requirements
     const unitMap: { [key: string]: string } = {
       // Cup variations
       'c': 'Cup',
       'cup': 'Cup',
       'cups': 'Cup',
-      
+
       // Tablespoon variations  
       'tbsp': 'Tbsp',
       'tbs': 'Tbsp',
       'tablespoon': 'Tbsp',
       'tablespoons': 'Tbsp',
       't': 'Tbsp', // common abbreviation
-      
+
       // Teaspoon variations
       'tsp': 'tsp',
       'teaspoon': 'tsp', 
       'teaspoons': 'tsp',
-      
+
       // Ounce variations
       'oz': 'oz',
       'ozs': 'oz',
       'ounce': 'oz',
       'ounces': 'oz',
-      
+
       // Pound variations
       'lb': 'lb',
       'lbs': 'lb',
       'pound': 'lb',
       'pounds': 'lb',
-      
+
       // Gram variations
       'g': 'g',
       'gram': 'g',
       'grams': 'g',
-      
+
       // Other units (keep as-is but standardize casing)
       'kg': 'kg',
       'kilogram': 'kg',
@@ -909,13 +912,13 @@ export class RecipeScraper {
       'package': 'package',
       'packages': 'package',
     };
-    
+
     return unitMap[unitLower] || unit; // Return standardized unit or original if not found
   }
 
   private static parseIngredientText(ingredientText: string): { name: string; quantity?: string; unit?: string } {
     const text = this.decodeHtmlEntities(ingredientText.trim());
-    
+
     // Common patterns for quantity and unit extraction
     const patterns = [
       // "1 to 2 ozs White Truffle Oil" -> quantity: "1 to 2", unit: "ozs", name: "White Truffle Oil"
@@ -941,7 +944,7 @@ export class RecipeScraper {
       const match = text.match(pattern);
       if (match) {
         console.log(`Pattern ${i} matched:`, match);
-        
+
         // Check if this is a unit-based pattern (first five patterns)
         if (i < 5 && match.length >= 4) {
           // Has explicit unit - standardize it

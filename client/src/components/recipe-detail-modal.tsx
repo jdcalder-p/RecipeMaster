@@ -493,26 +493,46 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
 
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Instructions</h2>
-              <div className="space-y-4">
-                {recipe.instructions.map((instruction, index) => (
-                  <div key={index} className="flex items-start space-x-3">
-                    <span className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium flex-shrink-0 mt-1">
-                      {index + 1}
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-gray-700 leading-relaxed mb-2">
-                        {typeof instruction === 'string' ? instruction : instruction.text}
-                      </p>
-                      {typeof instruction === 'object' && instruction.imageUrl && (
-                        <img 
-                          src={instruction.imageUrl} 
-                          alt={`Step ${index + 1}`}
-                          className="rounded-lg max-w-full h-auto mt-2"
-                        />
+              <div className="space-y-6">
+                {recipe.instructions.map((section, sectionIndex) => {
+                  let stepCounter = recipe.instructions
+                    .slice(0, sectionIndex)
+                    .reduce((acc, sec) => acc + (sec.steps?.length || 0), 0);
+                  
+                  return (
+                    <div key={sectionIndex} className="space-y-4">
+                      {section.sectionName && (
+                        <h3 className="text-lg font-medium text-gray-800 border-b border-gray-200 pb-2">
+                          {section.sectionName}
+                        </h3>
                       )}
+                      <div className="space-y-4">
+                        {(section.steps || []).map((step, stepIndex) => {
+                          stepCounter++;
+                          return (
+                            <div key={stepIndex} className="flex items-start space-x-3">
+                              <span className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium flex-shrink-0 mt-1">
+                                {stepCounter}
+                              </span>
+                              <div className="flex-1">
+                                <p className="text-gray-700 leading-relaxed mb-2">
+                                  {typeof step === 'string' ? step : step.text}
+                                </p>
+                                {typeof step === 'object' && step.imageUrl && (
+                                  <img 
+                                    src={step.imageUrl} 
+                                    alt={`Step ${stepCounter}`}
+                                    className="rounded-lg max-w-full h-auto mt-2"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               {recipe.instructions.length === 0 && (
                 <p className="text-gray-500 text-sm">No instructions provided</p>

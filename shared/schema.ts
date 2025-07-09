@@ -54,8 +54,11 @@ export const recipes = pgTable("recipes", {
     }[];
   }[]>().notNull().default([]),
   instructions: jsonb("instructions").$type<{
-    text: string;
-    imageUrl?: string;
+    sectionName?: string;
+    steps: {
+      text: string;
+      imageUrl?: string;
+    }[];
   }[]>().notNull().default([]),
   sourceUrl: text("source_url"),
   videoUrl: text("video_url"),
@@ -87,6 +90,14 @@ export const insertRecipeSchema = createInsertSchema(recipes).omit({
   id: true,
   userId: true,
   createdAt: true,
+}).extend({
+  instructions: z.array(z.object({
+    sectionName: z.string().optional(),
+    steps: z.array(z.object({
+      text: z.string().min(1, "Instruction text is required"),
+      imageUrl: z.string().optional(),
+    })).min(1, "At least one step is required"),
+  })).min(1, "At least one instruction section is required"),
 });
 
 export const insertMealPlanSchema = createInsertSchema(mealPlans).omit({
