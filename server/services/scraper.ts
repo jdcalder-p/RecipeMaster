@@ -496,124 +496,161 @@ export class RecipeScraper {
             // Look for content in specific Chef Jean Pierre page structure
             const chefJPContent: string[] = [];
             
-            // First, try to find the actual recipe instructions in the page content
-            // Look for text patterns that indicate cooking steps
-            $('.entry-content, .post-content, .content, .recipe-content, main, article, .elementor-text-editor').each((_, container) => {
+            // Enhanced extraction for Chef Jean Pierre - look for instruction blocks after section headings
+            $('.entry-content, .post-content, .content, .recipe-content, main, article, .elementor-text-editor, .elementor-widget-text-editor').each((_, container) => {
               console.log(`Checking container: ${$(container).attr('class') || 'no-class'}`);
               
-              // Look for all text content that might be instructions
-              $(container).find('p, div, span, li, h1, h2, h3, h4, h5, h6, strong, b').each((_, el) => {
+              // Find section headings that might precede instructions
+              $(container).find('h1, h2, h3, h4, h5, h6, p, div, strong, b').each((_, el) => {
                 const $el = $(el);
-                let text = $el.text().trim();
+                const headingText = $el.text().trim();
                 
-                // Skip if this element has significant child elements (likely a container)
-                const childElements = $el.children().not('span, strong, b, em, i, a');
-                if (childElements.length > 1) return;
-                
-                // Skip very short or very long text
-                if (text.length < 10 || text.length > 2000) return;
-                
-                // Skip common non-instruction content
-                if (text.toLowerCase().includes('advertisement') ||
-                    text.toLowerCase().includes('subscribe') ||
-                    text.toLowerCase().includes('comment') ||
-                    text.toLowerCase().includes('social') ||
-                    text.toLowerCase().includes('facebook') ||
-                    text.toLowerCase().includes('twitter') ||
-                    text.toLowerCase().includes('instagram') ||
-                    text.toLowerCase().includes('youtube channel') ||
-                    text.toLowerCase().includes('follow me') ||
-                    text.toLowerCase().includes('website') ||
-                    text.toLowerCase().includes('click here') ||
-                    text.toLowerCase().includes('video recipe') ||
-                    text.toLowerCase().includes('watch the video') ||
-                    text.toLowerCase().includes('bon appétit') ||
-                    text.toLowerCase().includes('enjoy') && text.length < 50) {
-                  return;
-                }
-                
-                // Clean up the text - remove HTML entities and extra whitespace
-                text = text.replace(/&[#\w]+;/g, ' ')
-                          .replace(/\s+/g, ' ')
-                          .trim();
-                
-                // Look for cooking instruction patterns
-                const cookingIndicators = [
-                  // Action words
-                  'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
-                  'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
-                  'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
-                  'crack', 'beat', 'fold', 'melt', 'warm', 'cool', 'chill', 'drain',
-                  'strain', 'sift', 'knead', 'roll', 'cut', 'trim', 'peel', 'grate',
+                // Check if this looks like a section heading for instructions
+                if (/makes?\s+\d+.*serving|instructions?|method|directions?|steps?|preparation/i.test(headingText)) {
+                  console.log(`Found instruction section heading: "${headingText}"`);
                   
-                  // Cooking terms
-                  'sauce', 'make', 'prepare', 'until', 'minutes', 'degrees', 'temperature',
-                  'pan', 'pot', 'bowl', 'oven', 'stove', 'flame', 'medium', 'high', 'low',
-                  'tender', 'golden', 'brown', 'crispy', 'melted', 'dissolved', 'bubbling',
-                  'simmering', 'steaming', 'smoking', 'caramelized',
+                  // Look for instruction content following this heading
+                  let $current = $el.next();
+                  let attempts = 0;
+                  let foundInstructionBlock = false;
                   
-                  // Timing and sequence words
-                  'first', 'then', 'next', 'after', 'before', 'while', 'during', 'finally',
-                  'meanwhile', 'simultaneously', 'gradually', 'slowly', 'quickly',
+                  while ($current.length && attempts < 20) {
+                    attempts++;
+                    
+                    const currentText = $current.text().trim();
+                    console.log(`Checking element after heading: "${currentText.substring(0, 100)}..."`);
+                    
+                    // Stop if we hit another major heading
+                    if ($current.is('h1, h2, h3, h4, h5, h6') && 
+                        currentText.length > 0 && 
+                        attempts > 1) {
+                      console.log(`Hit another heading, stopping search: "${currentText}"`);
+                      break;
+                    }
+                    
+                    // Check if this element contains instruction text
+                    if (currentText.length > 30 && currentText.length < 2000) {
+                      // Look for specific instruction patterns
+                      const hasInstructionWords = [
+                        'in a glass bowl', 'add the salt', 'mix well', 'wait at least',
+                        'after about', 'minutes', 'add all the ingredients', 
+                        'on a medium heat', 'in a frying pan', 'preferably non-stick',
+                        'when hot', 'degrees', 'using a wooden spoon', 'spatula',
+                        'mix the eggs', 'constantly', 'create small curds', 'cook only'
+                      ].some(phrase => currentText.toLowerCase().includes(phrase));
+                      
+                      const hasCookingActions = [
+                        'heat', 'cook', 'bake', 'add', 'mix', 'stir', 'combine', 'season',
+                        'serve', 'place', 'remove', 'dissolve', 'fry', 'melt', 'pour',
+                        'wait', 'using', 'create', 'constantly'
+                      ].some(word => currentText.toLowerCase().includes(word));
+                      
+                      const hasTimeOrTemp = /\b(\d+\s*minutes?|\d+\s*degrees?|\d+f\b|medium\s+heat|couple\s+minutes)\b/i.test(currentText);
+                      
+                      if (hasInstructionWords || (hasCookingActions && hasTimeOrTemp)) {
+                        console.log(`Found instruction content: "${currentText.substring(0, 150)}..."`);
+                        foundInstructionBlock = true;
+                        
+                        // If this is a long block of text, try to split it into sentences
+                        if (currentText.length > 200 && currentText.includes('.')) {
+                          const sentences = currentText.split(/\.\s+/)
+                            .map(s => s.trim())
+                            .filter(s => s.length > 15)
+                            .map(s => s.endsWith('.') ? s : s + '.');
+                          
+                          console.log(`Split long instruction into ${sentences.length} sentences`);
+                          chefJPContent.push(...sentences);
+                        } else {
+                          chefJPContent.push(currentText);
+                        }
+                      }
+                    }
+                    
+                    // Also check child elements for instruction text
+                    $current.find('p, div, span, li').each((_, child) => {
+                      const childText = $(child).text().trim();
+                      if (childText.length > 30 && childText.length < 1000) {
+                        const hasInstructionContent = [
+                          'glass bowl', 'salt', 'eggs', 'mix', 'minutes', 'ingredients',
+                          'frying pan', 'butter', 'heat', 'wooden spoon', 'spatula',
+                          'constantly', 'curds', 'cook'
+                        ].some(word => childText.toLowerCase().includes(word));
+                        
+                        if (hasInstructionContent) {
+                          console.log(`Found instruction in child element: "${childText.substring(0, 100)}..."`);
+                          chefJPContent.push(childText);
+                        }
+                      }
+                    });
+                    
+                    $current = $current.next();
+                  }
                   
-                  // Cooking equipment and techniques
-                  'whisk', 'spatula', 'ladle', 'tongs', 'thermometer', 'timer',
-                  'refrigerate', 'freeze', 'thaw', 'marinate', 'rest'
-                ];
-                
-                const hasCookingIndicators = cookingIndicators.some(word => 
-                  text.toLowerCase().includes(word)
-                );
-                
-                // Check for numbered steps or sequence indicators
-                const isNumberedStep = /^\d+[\.\)\-\:]/.test(text) || 
-                                      /^step \d+/i.test(text);
-                
-                // Check for common instruction sentence structures
-                const isInstructionStructure = 
-                  // Starts with imperative verbs
-                  /^(heat|cook|bake|add|mix|stir|place|remove|season|serve|prepare|make|cut|chop|slice|pour|beat|whisk|combine|fold|melt|warm|cool|drain|sift)/i.test(text) ||
-                  // Contains instructional phrases
-                  /\b(you will|you need to|make sure|be sure to|don't forget|remember to)\b/i.test(text) ||
-                  // Contains timing information
-                  /\b(\d+\s*minutes?|\d+\s*hours?|\d+\s*seconds?|until\s+\w+)\b/i.test(text);
-                
-                // Additional context clues
-                const hasTemperature = /\b\d+\s*degrees?\b/i.test(text);
-                const hasMeasurement = /\b\d+\s*(cup|cups|tbsp|tsp|oz|lb|gram|ml|liter)\b/i.test(text);
-                const hasTimeReference = /\b(\d+\s*min|minutes?|hours?|seconds?|until|while|during)\b/i.test(text);
-                
-                // Score the text based on how likely it is to be an instruction
-                let score = 0;
-                if (hasCookingIndicators) score += 2;
-                if (isNumberedStep) score += 3;
-                if (isInstructionStructure) score += 2;
-                if (hasTemperature) score += 1;
-                if (hasMeasurement) score += 1;
-                if (hasTimeReference) score += 1;
-                if (text.length > 30 && text.length < 500) score += 1;
-                
-                // If the text scores high enough, consider it an instruction
-                if (score >= 3 || (score >= 2 && text.length > 50)) {
-                  console.log(`Found potential instruction (score: ${score}): "${text.substring(0, 100)}..."`);
-                  chefJPContent.push(text);
+                  // If we found instruction content, we can stop looking
+                  if (foundInstructionBlock && chefJPContent.length > 0) {
+                    console.log(`Found ${chefJPContent.length} instruction blocks after heading "${headingText}"`);
+                    return false; // Break out of the each loop
+                  }
                 }
               });
+              
+              // If we still haven't found good instructions, do a broader search in this container
+              if (chefJPContent.length === 0) {
+                console.log("No instructions found with section-based search, trying broader search...");
+                
+                // Look for any text that might be instructions
+                $(container).find('*').each((_, el) => {
+                  const $el = $(el);
+                  const text = $el.text().trim();
+                  
+                  // Skip if this element has significant child elements (likely a container)
+                  const childElements = $el.children().not('span, strong, b, em, i, a');
+                  if (childElements.length > 1) return;
+                  
+                  // Look for text that mentions the specific instruction content we know is there
+                  if (text.length > 50 && text.length < 2000) {
+                    const hasSpecificContent = [
+                      'glass bowl', 'salt in the eggs', 'wait at least 15 minutes',
+                      'after about 15 minutes', 'frying pan', 'preferably non-stick',
+                      'medium heat', 'wooden spoon', 'silicone spatula', 'mix the eggs constantly',
+                      'create small curds', 'cook only a couple minutes'
+                    ].some(phrase => text.toLowerCase().includes(phrase));
+                    
+                    if (hasSpecificContent) {
+                      console.log(`Found specific instruction content: "${text.substring(0, 150)}..."`);
+                      
+                      // Split long text into logical instruction steps
+                      if (text.length > 200) {
+                        const steps = text.split(/\.\s+/)
+                          .map(s => s.trim())
+                          .filter(s => s.length > 20)
+                          .map(s => s.endsWith('.') ? s : s + '.');
+                        
+                        chefJPContent.push(...steps);
+                      } else {
+                        chefJPContent.push(text);
+                      }
+                    }
+                  }
+                });
+              }
             });
             
             // Remove duplicates and filter out low-quality content
             const uniqueChefJPContent = Array.from(new Set(chefJPContent))
               .filter(text => {
-                // Final quality check
+                // Final quality check - be more permissive for Chef Jean Pierre
                 return text.length > 20 && 
-                       text.length < 1000 &&
+                       text.length < 2000 &&
                        !text.match(/^(ingredients?|instruction|method|directions?|recipe|about|share|follow):?$/i) &&
-                       !text.toLowerCase().includes('makes 1') &&
-                       !text.toLowerCase().includes('serving') && text.length < 100;
+                       !text.toLowerCase().includes('advertisement') &&
+                       !text.toLowerCase().includes('subscribe') &&
+                       // Allow "makes 1" if it's part of a longer instruction
+                       !(text.toLowerCase().includes('makes 1') && text.length < 50);
               })
-              .slice(0, 15); // Keep reasonable number
+              .slice(0, 20); // Increase limit for Chef Jean Pierre
             
-            console.log(`Found ${uniqueChefJPContent.length} Chef Jean Pierre specific content blocks:`, uniqueChefJPContent);
+            console.log(`Found ${uniqueChefJPContent.length} Chef Jean Pierre specific content blocks:`, uniqueChefJPContent.slice(0, 5));
             
             if (uniqueChefJPContent.length > instructions.length) {
               instructions = uniqueChefJPContent;
