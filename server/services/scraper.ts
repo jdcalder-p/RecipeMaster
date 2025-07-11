@@ -1191,6 +1191,9 @@ export class RecipeScraper {
     for (const ingredient of ingredients) {
       const normalizedIngredient = ingredient.toLowerCase().trim();
       
+      // Skip empty ingredients
+      if (!normalizedIngredient) continue;
+      
       // Skip if we've already seen this exact ingredient
       if (seen.has(normalizedIngredient)) {
         continue;
@@ -1204,11 +1207,31 @@ export class RecipeScraper {
         const currentCore = this.extractCoreIngredientName(normalizedIngredient);
         const seenCore = this.extractCoreIngredientName(seenNormalized);
         
-        // If core names match, it's a duplicate
-        if (currentCore === seenCore && currentCore.length > 0) {
+        // Additional similarity checks
+        const currentWords = normalizedIngredient.split(/\s+/).filter(w => w.length > 2);
+        const seenWords = seenNormalized.split(/\s+/).filter(w => w.length > 2);
+        
+        // Check if core names match OR if there's significant word overlap
+        const coreMatch = currentCore === seenCore && currentCore.length > 0;
+        const wordOverlap = currentWords.some(word => seenWords.includes(word)) && 
+                           (currentWords.length <= 3 || seenWords.length <= 3); // Only for short ingredient names
+        
+        // Special cases for common ingredient patterns
+        const isPotatoVariant = /potato/i.test(normalizedIngredient) && /potato/i.test(seenNormalized);
+        const isBaconVariant = /bacon/i.test(normalizedIngredient) && /bacon/i.test(seenNormalized) && 
+                              !/bits/i.test(normalizedIngredient) !== !/bits/i.test(seenNormalized); // Different if one has "bits"
+        const isCheeseVariant = /cheese|cheddar/i.test(normalizedIngredient) && /cheese|cheddar/i.test(seenNormalized);
+        const isSourCreamVariant = /sour.*cream/i.test(normalizedIngredient) && /sour.*cream/i.test(seenNormalized);
+        const isShallotVariant = /shallot/i.test(normalizedIngredient) && /shallot/i.test(seenNormalized);
+        
+        if (coreMatch || wordOverlap || isPotatoVariant || isBaconVariant || isCheeseVariant || isSourCreamVariant || isShallotVariant) {
           isDuplicate = true;
-          // Keep the more detailed version (usually the one with quantity)
-          if (ingredient.length > seenOriginal.length) {
+          // Keep the more detailed version (usually the one with quantity and specific descriptors)
+          const currentHasQuantity = /^\d+/.test(ingredient) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound)/.test(ingredient);
+          const seenHasQuantity = /^\d+/.test(seenOriginal) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound)/.test(seenOriginal);
+          
+          if ((currentHasQuantity && !seenHasQuantity) || 
+              (currentHasQuantity === seenHasQuantity && ingredient.length > seenOriginal.length)) {
             // Replace with more detailed version
             const seenIndex = uniqueIngredients.indexOf(seenOriginal);
             if (seenIndex !== -1) {
