@@ -53,7 +53,7 @@ const standardizeUnit = (unit: string): string => {
   return unitMap[unitLower] || unit;
 };
 
-const formSchema = insertRecipeSchema.extend({
+const formSchema = insertRecipeSchema.omit({ instructions: true }).extend({
   instructions: z.array(z.object({
     text: z.string().min(1, "Instruction text is required"),
     imageUrl: z.string().optional(),
@@ -264,17 +264,22 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
       return;
     }
 
+    // Format instructions for backend compatibility
+    const formattedInstructions = [{
+      steps: filteredInstructions
+    }];
+
     console.log("Submitting recipe update:", {
       ...data,
       ingredients: filteredSections,
-      instructions: filteredInstructions,
+      instructions: formattedInstructions,
       servings: servingSize,
     });
 
     updateMutation.mutate({
       ...data,
       ingredients: filteredSections,
-      instructions: filteredInstructions,
+      instructions: formattedInstructions,
       servings: servingSize,
     });
   };
