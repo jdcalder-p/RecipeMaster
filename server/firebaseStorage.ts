@@ -188,12 +188,25 @@ export class FirebaseStorage implements IStorage {
         query = query.where('date', '>=', startDate).where('date', '<=', endDate);
       }
 
-      const snapshot = await query.orderBy('date').orderBy('mealType').get();
+      const snapshot = await query.get();
 
-      return snapshot.docs.map(doc => ({
+      // Sort on client side to avoid composite index requirement
+      const mealPlans = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as MealPlan[];
+
+      return mealPlans.sort((a, b) => {
+        // First sort by date
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        
+        // Then sort by meal type
+        const mealTypeOrder = { 'breakfast': 1, 'lunch': 2, 'dinner': 3 };
+        const aMealType = mealTypeOrder[a.mealType.toLowerCase()] || 4;
+        const bMealType = mealTypeOrder[b.mealType.toLowerCase()] || 4;
+        return aMealType - bMealType;
+      });
     } catch (error) {
       console.error('Error getting meal plans:', error);
       return [];
@@ -260,14 +273,22 @@ export class FirebaseStorage implements IStorage {
     try {
       const snapshot = await db.collection(COLLECTIONS.SHOPPING_LIST)
         .where('userId', '==', userId)
-        .orderBy('category')
-        .orderBy('name')
         .get();
 
-      return snapshot.docs.map(doc => ({
+      // Sort on client side to avoid composite index requirement
+      const items = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as ShoppingListItem[];
+
+      return items.sort((a, b) => {
+        // First sort by category
+        const categoryCompare = (a.category || '').localeCompare(b.category || '');
+        if (categoryCompare !== 0) return categoryCompare;
+        
+        // Then sort by name
+        return a.name.localeCompare(b.name);
+      });
     } catch (error) {
       console.error('Error getting shopping list items:', error);
       return [];
