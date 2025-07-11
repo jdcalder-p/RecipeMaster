@@ -205,10 +205,38 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
     const scaledValue = numericValue * multiplier;
     const formattedValue = formatNumber(scaledValue);
 
-    return `${formattedValue}${unit ? ` ${unit}` : ''} ${name}`rt);
-      };
+    return `${formattedValue}${unit ? ` ${unit}` : ''} ${name}`;
+  };
 
-      const firstValue = parseQuantityPart(rangeMatch[1]);
+  // Helper function to scale ingredient quantities
+  const scaleIngredient = (ingredient: string, multiplier: number): string => {
+    const parsed = parseIngredientText(ingredient);
+    return scaleIngredientItem(parsed, multiplier);
+  };
+
+  // Check for range quantities like "1 to 2", "1-2", "1 or 2"
+  const rangeMatch = quantity.trim().match(/^(\d+(?:\.\d+)?(?:[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])?(?:\/\d+)?)\s+(?:to|-|or)\s+(\d+(?:\.\d+)?(?:[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])?(?:\/\d+)?)$/i);
+
+  if (rangeMatch) {
+    // Parse both parts of the range
+    const parseQuantityPart = (part: string): number => {
+      if (unicodeFractions[part]) {
+        return unicodeFractions[part];
+      }
+      if (/\d+[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚]/.test(part)) {
+        const match = part.match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])$/);
+        if (match) {
+          return parseInt(match[1]) + unicodeFractions[match[2]];
+        }
+      }
+      if (part.includes('/')) {
+        const [num, denom] = part.split('/').map(Number);
+        return num / denom;
+      }
+      return parseFloat(part);
+    };
+
+    const firstValue = parseQuantityPart(rangeMatch[1]);
       const secondValue = parseQuantityPart(rangeMatch[2]);
 
       // Scale both values
