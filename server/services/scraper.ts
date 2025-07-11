@@ -89,47 +89,42 @@ export class RecipeScraper {
   }
 
   private static parseJsonLdRecipe(recipe: any, url: string): Partial<InsertRecipe> {
-    let ingredients: any[] = [];
-    let jsonLdIngredients: any[] = [];
+    let rawIngredients: string[] = [];
 
     // Try extracting from JSON-LD first
     if (recipe.recipeIngredient) {
       console.log(`🥗 JSON-LD INGREDIENTS RAW:`, recipe.recipeIngredient.slice(0, 5));
 
-      jsonLdIngredients = recipe.recipeIngredient.map((ing: any) => {
+      rawIngredients = recipe.recipeIngredient.map((ing: any) => {
         if (typeof ing === 'string') {
           return ing.trim();
         } else if (ing.name) {
           return ing.name.trim();
         }
-        return ing;
-      });
-
-      ingredients = [...jsonLdIngredients];
+        return String(ing).trim();
+      }).filter(Boolean);
     }
 
     // Handle case where ingredients might be a single string with multiple items
-    if (ingredients.length === 1 && ingredients[0].includes('\n')) {
-      ingredients = ingredients[0].split('\n').map((ing: string) => ing.trim()).filter(Boolean);
+    if (rawIngredients.length === 1 && rawIngredients[0].includes('\n')) {
+      rawIngredients = rawIngredients[0].split('\n').map((ing: string) => ing.trim()).filter(Boolean);
     }
 
     // Handle case where ingredients are separated by bullet points or dashes
-    // Only split on dashes that appear to be list separators (at the beginning of lines or after whitespace)
-    ingredients = ingredients.flatMap((ing: string) => {
+    rawIngredients = rawIngredients.flatMap((ing: string) => {
       // Split on bullet points or en-dashes
       if (ing.includes('•') || ing.includes('–')) {
         return ing.split(/[•–]/).map((item: string) => item.trim()).filter(Boolean);
       }
       // Only split on hyphens if they appear to be list separators (start of string or after newline/whitespace)
-      // Don't split if the dash is in the middle of a word (like "sun-dried")
       if (ing.includes('-') && /(?:^|\n\s*)-\s/.test(ing)) {
         return ing.split(/(?:^|\n\s*)-\s/).map((item: string) => item.trim()).filter(Boolean);
       }
       return ing;
     });
 
-    // Remove duplicates based on ingredient name similarity
-    const uniqueIngredients = this.removeDuplicateIngredients(ingredients);
+    // Clean and deduplicate ingredients with improved logic
+    const uniqueIngredients = this.cleanAndDeduplicateIngredients(rawIngredients);
 
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
@@ -446,11 +441,16 @@ export class RecipeScraper {
       ? [{ steps: instructionsWithImages }]
       : [{ steps: [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }] }];
 
+    // Clean up ingredients
+    const cleanedIngredients = ingredients.filter(Boolean).length > 0 
+      ? this.cleanAndDeduplicateIngredients(ingredients.filter(Boolean))
+      : [];
+
     return {
       title,
       description,
-      ingredients: ingredientsWithSections.length > 0 ? ingredientsWithSections : ingredients.filter(Boolean).length > 0 
-        ? [{ items: ingredients.filter(Boolean).map((ing: any) => {
+      ingredients: ingredientsWithSections.length > 0 ? ingredientsWithSections : cleanedIngredients.length > 0 
+        ? [{ items: cleanedIngredients.map((ing: string) => {
               const parsed = this.parseIngredientText(ing);
               // Capitalize the first letter of ingredient name
               parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
@@ -1338,94 +1338,145 @@ export class RecipeScraper {
     return [];
   }
 
-  private static removeDuplicateIngredients(ingredients: string[]): string[] {
-    const seen = new Map<string, string>(); // normalized -> original
-    const uniqueIngredients: string[] = [];
+  private static cleanAndDeduplicateIngredients(ingredients: string[]): string[] {
+    console.log(`🧹 Starting ingredient cleaning and deduplication for ${ingredients.length} ingredients`);
+    
+    // Step 1: Basic cleaning and filtering
+    const cleanedIngredients = ingredients
+      .map(ing => ing.trim())
+      .filter(ing => ing.length > 0 && this.looksLikeIngredient(ing))
+      .filter(ing => ing.length < 200); // Remove overly long text
 
-    for (const ingredient of ingredients) {
-      const normalizedIngredient = ingredient.toLowerCase().trim();
-      
-      // Skip empty ingredients
-      if (!normalizedIngredient) continue;
-      
-      // Skip if we've already seen this exact ingredient
-      if (seen.has(normalizedIngredient)) {
-        console.log(`🔍 Skipping exact duplicate: "${ingredient}"`);
-        continue;
+    console.log(`🧹 After basic cleaning: ${cleanedIngredients.length} ingredients`);
+
+    // Step 2: Exact duplicate removal (case-insensitive)
+    const exactDeduped = [];
+    const seenExact = new Set<string>();
+    
+    for (const ingredient of cleanedIngredients) {
+      const normalized = ingredient.toLowerCase().trim();
+      if (!seenExact.has(normalized)) {
+        seenExact.add(normalized);
+        exactDeduped.push(ingredient);
+      } else {
+        console.log(`🔍 Removed exact duplicate: "${ingredient}"`);
       }
+    }
 
-      // Check for similar ingredients by comparing core ingredient names
-      let isDuplicate = false;
+    console.log(`🧹 After exact deduplication: ${exactDeduped.length} ingredients`);
+
+    // Step 3: Semantic duplicate removal
+    const finalIngredients = [];
+    const semanticKeys = new Map<string, string>(); // semantic key -> original ingredient
+
+    for (const ingredient of exactDeduped) {
+      const semanticKey = this.generateSemanticKey(ingredient);
       
-      for (const [seenNormalized, seenOriginal] of seen.entries()) {
-        // Extract the main ingredient name by removing quantities and common descriptors
-        const currentCore = this.extractCoreIngredientName(normalizedIngredient);
-        const seenCore = this.extractCoreIngredientName(seenNormalized);
+      if (semanticKeys.has(semanticKey)) {
+        const existingIngredient = semanticKeys.get(semanticKey)!;
+        console.log(`🔍 Found semantic duplicate: "${ingredient}" vs "${existingIngredient}"`);
         
-        // Enhanced similarity checks
-        const currentWords = normalizedIngredient.split(/\s+/).filter(w => w.length > 2);
-        const seenWords = seenNormalized.split(/\s+/).filter(w => w.length > 2);
-        
-        // Check if core names match
-        const coreMatch = currentCore === seenCore && currentCore.length > 2;
-        
-        // Check for high word overlap (more than 50% of words match)
-        const commonWords = currentWords.filter(word => seenWords.includes(word));
-        const overlapRatio = commonWords.length / Math.min(currentWords.length, seenWords.length);
-        const significantOverlap = overlapRatio > 0.6 && commonWords.length >= 2;
-        
-        // Special cases for common ingredient patterns with exact matching
-        const isPotatoVariant = /\bpotato/i.test(normalizedIngredient) && /\bpotato/i.test(seenNormalized);
-        const isBaconVariant = /\bbacon\b/i.test(normalizedIngredient) && /\bbacon\b/i.test(seenNormalized);
-        const isSourCreamVariant = /\bsour\s+cream\b/i.test(normalizedIngredient) && /\bsour\s+cream\b/i.test(seenNormalized);
-        const isShallotVariant = /\bshallot/i.test(normalizedIngredient) && /\bshallot/i.test(seenNormalized);
-        const isCheeseVariant = (/\bcheddar\b/i.test(normalizedIngredient) && /\bcheddar\b/i.test(seenNormalized)) ||
-                               (/\bgoat\s+cheese\b/i.test(normalizedIngredient) && /\bgoat\s+cheese\b/i.test(seenNormalized)) ||
-                               (/\bparmesan\b/i.test(normalizedIngredient) && /\bparmesan\b/i.test(seenNormalized));
-        
-        // Check for bacon bits vs regular bacon (these should be different)
-        const isBaconBitsConflict = (/\bbacon\s+bits\b/i.test(normalizedIngredient) && /\bbacon\b/i.test(seenNormalized) && !/\bbits\b/i.test(seenNormalized)) ||
-                                   (/\bbacon\b/i.test(normalizedIngredient) && !/\bbits\b/i.test(normalizedIngredient) && /\bbacon\s+bits\b/i.test(seenNormalized));
-        
-        if ((coreMatch || significantOverlap || isPotatoVariant || isBaconVariant || isCheeseVariant || isSourCreamVariant || isShallotVariant) && !isBaconBitsConflict) {
-          isDuplicate = true;
-          console.log(`🔍 Found duplicate: "${ingredient}" matches "${seenOriginal}"`);
-          
-          // Keep the more detailed version (usually the one with quantity and specific descriptors)
-          const currentHasQuantity = /^\d+/.test(ingredient) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound|ounce)/.test(ingredient);
-          const seenHasQuantity = /^\d+/.test(seenOriginal) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound|ounce)/.test(seenOriginal);
-          
-          // Prefer the version with more specific information
-          const currentSpecificity = (ingredient.match(/\b(large|medium|small|russet|white|sharp|shredded|grated|crumbled|optional)\b/gi) || []).length;
-          const seenSpecificity = (seenOriginal.match(/\b(large|medium|small|russet|white|sharp|shredded|grated|crumbled|optional)\b/gi) || []).length;
-          
-          if ((currentHasQuantity && !seenHasQuantity) || 
-              (currentHasQuantity === seenHasQuantity && currentSpecificity > seenSpecificity) ||
-              (currentHasQuantity === seenHasQuantity && currentSpecificity === seenSpecificity && ingredient.length > seenOriginal.length)) {
-            // Replace with more detailed version
-            const seenIndex = uniqueIngredients.indexOf(seenOriginal);
-            if (seenIndex !== -1) {
-              console.log(`🔄 Replacing "${seenOriginal}" with "${ingredient}"`);
-              uniqueIngredients[seenIndex] = ingredient;
-              seen.delete(seenNormalized);
-              seen.set(normalizedIngredient, ingredient);
-            }
-          } else {
-            console.log(`🔄 Keeping existing "${seenOriginal}" over "${ingredient}"`);
+        // Keep the more detailed/specific version
+        if (this.isMoreDetailed(ingredient, existingIngredient)) {
+          console.log(`🔄 Replacing "${existingIngredient}" with "${ingredient}"`);
+          const index = finalIngredients.indexOf(existingIngredient);
+          if (index !== -1) {
+            finalIngredients[index] = ingredient;
+            semanticKeys.set(semanticKey, ingredient);
           }
-          break;
+        } else {
+          console.log(`🔄 Keeping "${existingIngredient}" over "${ingredient}"`);
         }
-      }
-
-      if (!isDuplicate) {
-        seen.set(normalizedIngredient, ingredient);
-        uniqueIngredients.push(ingredient);
+      } else {
+        semanticKeys.set(semanticKey, ingredient);
+        finalIngredients.push(ingredient);
         console.log(`✅ Added unique ingredient: "${ingredient}"`);
       }
     }
 
-    console.log(`📊 Final unique ingredients count: ${uniqueIngredients.length}`);
-    return uniqueIngredients;
+    console.log(`📊 Final unique ingredients count: ${finalIngredients.length}`);
+    return finalIngredients;
+  }
+
+  private static generateSemanticKey(ingredient: string): string {
+    // Convert ingredient to a semantic key for duplicate detection
+    let key = ingredient.toLowerCase().trim();
+
+    // Remove numbers and quantities at the beginning
+    key = key.replace(/^\d+(\s*\/\s*\d+)?(\s+\d+\/\d+)?\s*/i, '');
+    key = key.replace(/^(½|¼|¾|⅓|⅔|⅛|⅜|⅝|⅞)\s*/i, '');
+
+    // Remove measurement units
+    key = key.replace(/\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\s*/gi, ' ');
+
+    // Remove descriptive adjectives at the beginning
+    key = key.replace(/^(large|medium|small|whole|fresh|dried|ground|chopped|minced|sliced|diced|grated|shredded|crumbled|softened|melted|packed|optional|white|sharp|aged|extra|virgin|unsalted|salted|heavy|light|2%|whole)\s+/gi, '');
+
+    // Remove parenthetical content and trailing descriptors
+    key = key.replace(/\s*\([^)]*\)\s*/g, ' ');
+    key = key.replace(/\s*,\s*(shredded|grated|crumbled|chopped|minced|sliced|diced|optional).*$/i, '');
+
+    // Normalize whitespace
+    key = key.replace(/\s+/g, ' ').trim();
+
+    // Handle specific ingredient types to avoid false positives
+    if (/bacon\s+bits/i.test(key)) {
+      return 'bacon_bits';
+    } else if (/bacon/i.test(key)) {
+      return 'bacon';
+    }
+
+    if (/white\s+cheddar|cheddar.*white/i.test(ingredient.toLowerCase())) {
+      return 'white_cheddar_cheese';
+    } else if (/cheddar/i.test(key)) {
+      return 'cheddar_cheese';
+    }
+
+    if (/goat\s+cheese/i.test(key)) {
+      return 'goat_cheese';
+    }
+
+    if (/parmesan/i.test(key)) {
+      return 'parmesan_cheese';
+    }
+
+    if (/sour\s+cream/i.test(key)) {
+      return 'sour_cream';
+    }
+
+    if (/russet.*potato|potato.*russet/i.test(ingredient.toLowerCase())) {
+      return 'russet_potatoes';
+    } else if (/potato/i.test(key)) {
+      return 'potatoes';
+    }
+
+    if (/shallot/i.test(key)) {
+      return 'shallots';
+    }
+
+    // Return the cleaned key
+    return key || ingredient.toLowerCase();
+  }
+
+  private static isMoreDetailed(ingredient1: string, ingredient2: string): boolean {
+    // Determine which ingredient is more detailed/specific
+    
+    // Check for quantities - prefer ingredients with quantities
+    const hasQuantity1 = /^\d+/.test(ingredient1) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound|ounce|g|gram|kg|ml|l)/.test(ingredient1);
+    const hasQuantity2 = /^\d+/.test(ingredient2) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound|ounce|g|gram|kg|ml|l)/.test(ingredient2);
+    
+    if (hasQuantity1 && !hasQuantity2) return true;
+    if (!hasQuantity1 && hasQuantity2) return false;
+
+    // Check for descriptive terms - prefer more descriptive ingredients
+    const descriptors1 = (ingredient1.match(/\b(large|medium|small|russet|white|sharp|shredded|grated|crumbled|optional|fresh|dried|ground|chopped|minced|sliced|diced|softened|melted|packed)\b/gi) || []).length;
+    const descriptors2 = (ingredient2.match(/\b(large|medium|small|russet|white|sharp|shredded|grated|crumbled|optional|fresh|dried|ground|chopped|minced|sliced|diced|softened|melted|packed)\b/gi) || []).length;
+    
+    if (descriptors1 > descriptors2) return true;
+    if (descriptors1 < descriptors2) return false;
+
+    // If all else is equal, prefer the longer ingredient name (likely more specific)
+    return ingredient1.length > ingredient2.length;
   }
 
   private static extractCoreIngredientName(ingredient: string): string {
@@ -1539,7 +1590,7 @@ export class RecipeScraper {
 
         if (filteredIngredients.length > 0) {
           // Remove duplicates before returning
-          return this.removeDuplicateIngredients(filteredIngredients);
+          return this.cleanAndDeduplicateIngredients(filteredIngredients);
         }
       }
     }
