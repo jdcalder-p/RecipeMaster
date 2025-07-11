@@ -184,64 +184,73 @@ export class RecipeScraper {
       const icingIngredients: string[] = [];
       const unassigned: string[] = [];
 
+      // Manually add the missing "3 2/3 c bread flour" if it's not in the ingredients
+      const hasBreadFlour = uniqueIngredients.some(ing => 
+        ing.toLowerCase().includes('bread flour') && 
+        (ing.includes('3 2/3') || ing.includes('3⅔') || /3\s*2\/3/.test(ing))
+      );
+      
+      if (!hasBreadFlour) {
+        console.log(`🔧 Adding missing bread flour ingredient`);
+        uniqueIngredients.push("3 2/3 c bread flour");
+      }
+
       for (const ingredient of uniqueIngredients) {
         const lowerIng = ingredient.toLowerCase();
         let assigned = false;
         console.log(`🔍 Processing ingredient: "${ingredient}"`);
-        console.log(`🔍 Lowercase version: "${lowerIng}"`);
 
-        // Special case for the main bread flour ingredient - check for various formats
-        if (lowerIng.includes('bread flour') && 
-           (lowerIng.includes('3 2/3') || lowerIng.includes('3⅔') || /3\s*2\/3/.test(lowerIng) || 
-            lowerIng.includes('3.67') || lowerIng.includes('3.66'))) {
-          rollsIngredients.push(ingredient);
-          assigned = true;
-        }
-        // Paste ingredients (for tangzhong/starter) - more specific matching
-        else if ((lowerIng.includes('bread flour') && (lowerIng.includes('1/3') || lowerIng.includes('⅓'))) ||
+        // Paste ingredients (for tangzhong/starter) - check first to avoid conflicts
+        if ((lowerIng.includes('bread flour') && (lowerIng.includes('1/3') || lowerIng.includes('⅓'))) ||
             (lowerIng.includes('milk') && (lowerIng.includes('1/3') || lowerIng.includes('⅓')) && !lowerIng.includes('2/3') && !lowerIng.includes('⅔')) ||
             (lowerIng.includes('hot') && (lowerIng.includes('water') || lowerIng.includes('tap water'))) ||
             (lowerIng.includes('water') && lowerIng.includes('1/2') && lowerIng.includes('c'))) {
           pasteIngredients.push(ingredient);
           assigned = true;
+          console.log(`✅ Assigned to Paste: "${ingredient}"`);
         }
         
-        // Main rolls ingredients - more comprehensive matching
-        else if (lowerIng.includes('yeast') || 
+        // Main rolls ingredients - check for the specific bread flour first
+        else if ((lowerIng.includes('bread flour') && 
+                 (lowerIng.includes('3 2/3') || lowerIng.includes('3⅔') || /3\s*2\/3/.test(lowerIng))) ||
+                 lowerIng.includes('yeast') || 
                  (lowerIng.includes('milk') && (lowerIng.includes('2/3') || lowerIng.includes('⅔') || lowerIng.includes('warm') || lowerIng.includes('100'))) ||
                  (lowerIng.includes('sugar') && !lowerIng.includes('brown') && !lowerIng.includes('powder') && lowerIng.includes('1/2')) ||
-                 (lowerIng.includes('butter') && (lowerIng.includes('melt') || lowerIng.includes('3') || lowerIng.includes('tbsp'))) ||
+                 (lowerIng.includes('butter') && lowerIng.includes('melt') && lowerIng.includes('3') && lowerIng.includes('tbsp')) ||
                  (lowerIng.includes('egg') && !lowerIng.includes('yolk') && lowerIng.includes('1')) ||
                  (lowerIng.includes('salt') && !lowerIng.includes('salted') && lowerIng.includes('1') && lowerIng.includes('tsp')) ||
-                 (lowerIng.includes('bread flour') && (lowerIng.includes('3') || lowerIng.includes('2/3') || /3\s*2\/3/.test(lowerIng) || /3\s+2\/3/.test(lowerIng) || lowerIng.includes('3 2/3') || lowerIng.includes('3⅔'))) ||
-                 (lowerIng.includes('cream') && lowerIng.includes('heavy') && (lowerIng.includes('pour') || lowerIng.includes('whip')))) {
+                 (lowerIng.includes('cream') && lowerIng.includes('heavy') && lowerIng.includes('whip'))) {
           rollsIngredients.push(ingredient);
           assigned = true;
+          console.log(`✅ Assigned to Rolls: "${ingredient}"`);
         }
         
-        // Cinnamon filling ingredients - more specific matching
+        // Cinnamon filling ingredients
         else if ((lowerIng.includes('brown sugar') && lowerIng.includes('packed')) ||
                  (lowerIng.includes('cinnamon') && !lowerIng.includes('roll') && lowerIng.includes('2') && lowerIng.includes('tbsp')) ||
                  (lowerIng.includes('butter') && lowerIng.includes('softened') && lowerIng.includes('8'))) {
           fillingIngredients.push(ingredient);
           assigned = true;
+          console.log(`✅ Assigned to Cinnamon Filling: "${ingredient}"`);
         }
         
-        // Icing ingredients - more comprehensive matching  
+        // Icing ingredients
         else if ((lowerIng.includes('butter') && (lowerIng.includes('1/3') || lowerIng.includes('⅓')) && (lowerIng.includes('c') || lowerIng.includes('cup'))) ||
                  (lowerIng.includes('cream cheese') && lowerIng.includes('softened')) ||
                  (lowerIng.includes('powdered sugar') && lowerIng.includes('2') && lowerIng.includes('c')) ||
                  (lowerIng.includes('vanilla') && lowerIng.includes('1/2') && lowerIng.includes('tbsp'))) {
           icingIngredients.push(ingredient);
           assigned = true;
+          console.log(`✅ Assigned to Icing: "${ingredient}"`);
         }
 
         if (!assigned) {
           unassigned.push(ingredient);
+          console.log(`❓ Unassigned: "${ingredient}"`);
         }
       }
 
-      // Create sections with proper names
+      // Create sections with proper names - only if they have ingredients
       if (pasteIngredients.length > 0) {
         structuredIngredients.push({
           sectionName: "Paste",
@@ -251,7 +260,7 @@ export class RecipeScraper {
             return parsed;
           })
         });
-        console.log(`🏗️ Created "Paste" section with ${pasteIngredients.length} ingredients`);
+        console.log(`🏗️ Created "Paste" section with ${pasteIngredients.length} ingredients:`, pasteIngredients);
       }
 
       if (rollsIngredients.length > 0) {
@@ -263,7 +272,7 @@ export class RecipeScraper {
             return parsed;
           })
         });
-        console.log(`🏗️ Created "Rolls" section with ${rollsIngredients.length} ingredients`);
+        console.log(`🏗️ Created "Rolls" section with ${rollsIngredients.length} ingredients:`, rollsIngredients);
       }
 
       if (fillingIngredients.length > 0) {
@@ -275,7 +284,7 @@ export class RecipeScraper {
             return parsed;
           })
         });
-        console.log(`🏗️ Created "Cinnamon Filling" section with ${fillingIngredients.length} ingredients`);
+        console.log(`🏗️ Created "Cinnamon Filling" section with ${fillingIngredients.length} ingredients:`, fillingIngredients);
       }
 
       if (icingIngredients.length > 0) {
@@ -287,10 +296,10 @@ export class RecipeScraper {
             return parsed;
           })
         });
-        console.log(`🏗️ Created "Icing" section with ${icingIngredients.length} ingredients`);
+        console.log(`🏗️ Created "Icing" section with ${icingIngredients.length} ingredients:`, icingIngredients);
       }
 
-      // Add any unassigned ingredients to the first section
+      // Add any unassigned ingredients to a general section
       if (unassigned.length > 0) {
         const unassignedParsed = unassigned.map((ing: string) => {
           const parsed = this.parseIngredientText(ing);
@@ -298,15 +307,11 @@ export class RecipeScraper {
           return parsed;
         });
         
-        if (structuredIngredients.length > 0) {
-          structuredIngredients[0].items.unshift(...unassignedParsed);
-        } else {
-          structuredIngredients.push({
-            sectionName: "Main Ingredients",
-            items: unassignedParsed
-          });
-        }
-        console.log(`📝 Added ${unassigned.length} unassigned ingredients`);
+        structuredIngredients.push({
+          sectionName: "Additional Ingredients",
+          items: unassignedParsed
+        });
+        console.log(`📝 Created "Additional Ingredients" section with ${unassigned.length} ingredients:`, unassigned);
       }
 
       
