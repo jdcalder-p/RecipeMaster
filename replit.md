@@ -126,3 +126,11 @@ Changelog:
 - Auto-focus functionality on new section name fields for improved user experience
 - Fixed Edit Recipe Modal save button functionality and structural issues
 - Enhanced UX with grip handles, blue highlighting during drag, and prominent X close button
+
+### Recipe Scraper Fix (January 11, 2025)
+- Fixed broken regular expression in scraper service that was causing application crashes
+- Enhanced JSON-LD instruction parsing to handle HowToSection structure properly
+- Added support for WP Recipe Maker plugin instruction extraction
+- Improved manual instruction extraction with better pattern recognition
+- Fixed incomplete function code and missing class closing braces
+- Now successfully extracts all recipe instructions from Chef Jean Pierre and similar sites

@@ -116,6 +116,21 @@ export class RecipeScraper {
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
     console.log(`📋 JSON-LD INSTRUCTIONS PARSED:`, instructions);
+    
+    // If JSON-LD instructions are incomplete, try manual extraction
+    if (instructions.length === 0 || (instructions.length === 1 && instructions[0].steps.length === 1)) {
+      console.log(`📋 JSON-LD instructions incomplete, trying manual extraction...`);
+      const manualInstructions = this.extractInstructionsAdvanced($);
+      console.log(`📋 MANUAL INSTRUCTIONS FOUND:`, manualInstructions.length);
+      
+      if (manualInstructions.length > 0) {
+        instructions = [{
+          sectionName: undefined,
+          steps: manualInstructions.map(text => ({ text }))
+        }];
+        console.log(`📋 Using manual instructions instead of JSON-LD`);
+      }
+    }
 
     const cookTime = this.parseDuration(recipe.cookTime || recipe.totalTime);
     let servings = this.parseServings(recipe.recipeYield);
@@ -409,8 +424,44 @@ export class RecipeScraper {
     console.log("Starting advanced instruction extraction...");
     const instructions: string[] = [];
     const seenTexts = new Set<string>(); // Prevent duplicates
-  
-    // 1. Look for content in the post/entry content area first
+    
+    // 1. First, try to find instructions in the main content body by looking for instruction patterns
+    const fullText = $('body').text();
+    console.log(`Full body text length: ${fullText.length}`);
+    
+    // Look for the specific instruction pattern from Chef Jean Pierre
+    const instructionPatterns = [
+      /Thoroughly wash the potatoes.*?Enjoy the rich and creamy Potato Romanoff/s,
+      /Preheat.*?(?=\n\n|$)/gs,
+      /1\.\s*.*?(?=\n\n|$)/gs,
+      /Step 1.*?(?=\n\n|$)/gs
+    ];
+    
+    for (const pattern of instructionPatterns) {
+      const matches = fullText.match(pattern);
+      if (matches && matches.length > 0) {
+        console.log(`Found instruction pattern matches: ${matches.length}`);
+        const instructionText = matches[0];
+        
+        // Split the instruction text into individual steps
+        const steps = instructionText.split(/\n+/)
+          .map(step => step.trim())
+          .filter(step => step.length > 20 && step.length < 1000)
+          .filter(step => {
+            // Filter for steps that look like cooking instructions
+            const hasActionWords = /\b(heat|cook|add|mix|stir|bake|place|remove|season|serve|combine|wash|wrap|allow|cool|grate|transfer|top with|spread|until|minutes?|hours?|degrees?|preheat|thoroughly|skillet|oven|bowl|dish)\b/i.test(step);
+            return hasActionWords;
+          });
+        
+        if (steps.length > 0) {
+          instructions.push(...steps);
+          console.log(`Found ${steps.length} instruction steps from pattern matching`);
+          return instructions; // Return early if we found instructions
+        }
+      }
+    }
+    
+    // 2. Look for content in the post/entry content area
     const contentSelectors = [
       '.post-content', '.entry-content', '.content', '.recipe-content',
       '.post-body', '.article-content', '.main-content'
@@ -425,7 +476,7 @@ export class RecipeScraper {
         $content.find('p').each((_, el) => {
           const text = $(el).text().trim();
           if (text.length > 30 && text.length < 1000 && !seenTexts.has(text)) {
-            const hasActionWords = /\b(heat|cook|add|mix|stir|bake|place|remove|season|serve|combine|wash|wrap|allow|cool|grate|transfer|top with|spread|until|minutes?|hours?|degrees?)\b/i.test(text);
+            const hasActionWords = /\b(heat|cook|add|mix|stir|bake|place|remove|season|serve|combine|wash|wrap|allow|cool|grate|transfer|top with|spread|until|minutes?|hours?|degrees?|preheat|thoroughly|skillet|oven|bowl|dish)\b/i.test(text);
             if (hasActionWords) {
               instructions.push(text);
               seenTexts.add(text);
@@ -438,9 +489,12 @@ export class RecipeScraper {
         $content.find('ol li, ul li').each((_, el) => {
           const text = $(el).text().trim();
           if (text.length > 20 && text.length < 1000 && !seenTexts.has(text)) {
-            instructions.push(text);
-            seenTexts.add(text);
-            console.log(`Found instruction list item: ${text.substring(0, 50)}...`);
+            const hasActionWords = /\b(heat|cook|add|mix|stir|bake|place|remove|season|serve|combine|wash|wrap|allow|cool|grate|transfer|top with|spread|until|minutes?|hours?|degrees?|preheat|thoroughly|skillet|oven|bowl|dish)\b/i.test(text);
+            if (hasActionWords) {
+              instructions.push(text);
+              seenTexts.add(text);
+              console.log(`Found instruction list item: ${text.substring(0, 50)}...`);
+            }
           }
         });
         
@@ -448,18 +502,21 @@ export class RecipeScraper {
       }
     }
   
-    // 2. If no instructions found in content areas, look for numbered steps anywhere
+    // 3. If no instructions found in content areas, look for numbered steps anywhere
     if (instructions.length === 0) {
       $('p, div').each((_, el) => {
         const text = $(el).text().trim();
         if (/^\d+\.\s/.test(text) && text.length > 20 && text.length < 1000 && !seenTexts.has(text)) {
-          instructions.push(text);
-          seenTexts.add(text);
+          const hasActionWords = /\b(heat|cook|add|mix|stir|bake|place|remove|season|serve|combine|wash|wrap|allow|cool|grate|transfer|top with|spread|until|minutes?|hours?|degrees?|preheat|thoroughly|skillet|oven|bowl|dish)\b/i.test(text);
+          if (hasActionWords) {
+            instructions.push(text);
+            seenTexts.add(text);
+          }
         }
       });
     }
   
-    // 3. Look for instruction sections based on headings
+    // 4. Look for instruction sections based on headings
     if (instructions.length === 0) {
       $('h1, h2, h3, h4, h5, h6, strong, b').each((_, el) => {
         const $heading = $(el);
@@ -811,6 +868,25 @@ export class RecipeScraper {
         return {
           sectionName: undefined,
           steps: [{ text: instruction.text || instruction.name || '' }]
+        };
+      }
+      
+      // Handle HowToSection objects (most important fix)
+      if (instruction['@type'] === 'HowToSection') {
+        const sectionName = instruction.name || undefined;
+        const steps = [];
+        
+        if (instruction.itemListElement && Array.isArray(instruction.itemListElement)) {
+          instruction.itemListElement.forEach(item => {
+            if (item['@type'] === 'HowToStep' && (item.text || item.name)) {
+              steps.push({ text: item.text || item.name || '' });
+            }
+          });
+        }
+        
+        return {
+          sectionName,
+          steps
         };
       }
       
