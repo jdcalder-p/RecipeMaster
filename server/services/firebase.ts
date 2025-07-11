@@ -41,6 +41,7 @@ export const db = getFirestore();
 
 // Collection names
 export const COLLECTIONS = {
+  USERS: 'users',
   RECIPES: 'recipes',
   MEAL_PLANS: 'mealPlans',
   SHOPPING_LIST: 'shoppingList',
