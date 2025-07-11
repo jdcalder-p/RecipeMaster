@@ -89,9 +89,24 @@ export class RecipeScraper {
   }
 
   private static parseJsonLdRecipe(recipe: any, url: string): Partial<InsertRecipe> {
-    let ingredients = Array.isArray(recipe.recipeIngredient) 
-      ? recipe.recipeIngredient.map((ing: any) => typeof ing === 'string' ? ing : ing.text || '')
-      : [];
+    let ingredients: any[] = [];
+    let jsonLdIngredients: any[] = [];
+
+    // Try extracting from JSON-LD first
+    if (recipe.recipeIngredient) {
+      console.log(`🥗 JSON-LD INGREDIENTS RAW:`, recipe.recipeIngredient.slice(0, 5));
+
+      jsonLdIngredients = recipe.recipeIngredient.map((ing: any) => {
+        if (typeof ing === 'string') {
+          return ing.trim();
+        } else if (ing.name) {
+          return ing.name.trim();
+        }
+        return ing;
+      });
+
+      ingredients = [...jsonLdIngredients];
+    }
 
     // Handle case where ingredients might be a single string with multiple items
     if (ingredients.length === 1 && ingredients[0].includes('\n')) {
@@ -116,13 +131,13 @@ export class RecipeScraper {
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
     console.log(`📋 JSON-LD INSTRUCTIONS PARSED:`, instructions);
-    
+
     // If JSON-LD instructions are incomplete, try manual extraction
     if (instructions.length === 0 || (instructions.length === 1 && instructions[0].steps.length === 1)) {
       console.log(`📋 JSON-LD instructions incomplete, trying manual extraction...`);
       const manualInstructions = this.extractInstructionsAdvanced($);
       console.log(`📋 MANUAL INSTRUCTIONS FOUND:`, manualInstructions.length);
-      
+
       if (manualInstructions.length > 0) {
         instructions = [{
           sectionName: undefined,
@@ -424,11 +439,11 @@ export class RecipeScraper {
     console.log("Starting advanced instruction extraction...");
     const instructions: string[] = [];
     const seenTexts = new Set<string>(); // Prevent duplicates
-    
+
     // 1. First, try to find instructions in the main content body by looking for instruction patterns
     const fullText = $('body').text();
     console.log(`Full body text length: ${fullText.length}`);
-    
+
     // Look for the specific instruction pattern from Chef Jean Pierre
     const instructionPatterns = [
       /Thoroughly wash the potatoes.*?Enjoy the rich and creamy Potato Romanoff/s,
@@ -436,13 +451,13 @@ export class RecipeScraper {
       /1\.\s*.*?(?=\n\n|$)/gs,
       /Step 1.*?(?=\n\n|$)/gs
     ];
-    
+
     for (const pattern of instructionPatterns) {
       const matches = fullText.match(pattern);
       if (matches && matches.length > 0) {
         console.log(`Found instruction pattern matches: ${matches.length}`);
         const instructionText = matches[0];
-        
+
         // Split the instruction text into individual steps
         const steps = instructionText.split(/\n+/)
           .map(step => step.trim())
@@ -452,7 +467,7 @@ export class RecipeScraper {
             const hasActionWords = /\b(heat|cook|add|mix|stir|bake|place|remove|season|serve|combine|wash|wrap|allow|cool|grate|transfer|top with|spread|until|minutes?|hours?|degrees?|preheat|thoroughly|skillet|oven|bowl|dish)\b/i.test(step);
             return hasActionWords;
           });
-        
+
         if (steps.length > 0) {
           instructions.push(...steps);
           console.log(`Found ${steps.length} instruction steps from pattern matching`);
@@ -460,18 +475,18 @@ export class RecipeScraper {
         }
       }
     }
-    
+
     // 2. Look for content in the post/entry content area
     const contentSelectors = [
       '.post-content', '.entry-content', '.content', '.recipe-content',
       '.post-body', '.article-content', '.main-content'
     ];
-    
+
     for (const contentSelector of contentSelectors) {
       const $content = $(contentSelector);
       if ($content.length) {
         console.log(`Found content area: ${contentSelector}`);
-        
+
         // Look for paragraphs with cooking instructions
         $content.find('p').each((_, el) => {
           const text = $(el).text().trim();
@@ -484,7 +499,7 @@ export class RecipeScraper {
             }
           }
         });
-        
+
         // Look for list items within content
         $content.find('ol li, ul li').each((_, el) => {
           const text = $(el).text().trim();
@@ -497,11 +512,11 @@ export class RecipeScraper {
             }
           }
         });
-        
+
         if (instructions.length > 0) break; // Stop if we found instructions in this content area
       }
     }
-  
+
     // 3. If no instructions found in content areas, look for numbered steps anywhere
     if (instructions.length === 0) {
       $('p, div').each((_, el) => {
@@ -515,20 +530,20 @@ export class RecipeScraper {
         }
       });
     }
-  
+
     // 4. Look for instruction sections based on headings
     if (instructions.length === 0) {
       $('h1, h2, h3, h4, h5, h6, strong, b').each((_, el) => {
         const $heading = $(el);
         const headingText = $heading.text().trim().toLowerCase();
-  
+
         if (/(instructions?|method|directions?|steps?|preparation)/.test(headingText)) {
           let $next = $heading.next();
           let attempts = 0;
-  
+
           while ($next.length && attempts < 10) {
             attempts++;
-            
+
             if ($next.is('p, div')) {
               const nextText = $next.text().trim();
               if (nextText.length > 20 && nextText.length < 1000 && !seenTexts.has(nextText)) {
@@ -544,13 +559,13 @@ export class RecipeScraper {
                 }
               });
             }
-  
+
             $next = $next.next();
           }
         }
       });
     }
-  
+
     console.log(`Found ${instructions.length} instructions via advanced extraction`);
     return instructions;
   }
@@ -558,12 +573,12 @@ export class RecipeScraper {
   private static parseIngredientText(ingredientText: string): { name: string; quantity?: string; unit?: string; } {
     // Clean up the text
     const cleanText = ingredientText.trim().replace(/^\d+\.\s*/, ''); // Remove numbering
-    
+
     // Common measurement patterns
     const measurementRegex = /^(\d+(?:\/\d+)?(?:\.\d+)?)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)\s+(.+)/i;
-    
+
     const match = cleanText.match(measurementRegex);
-    
+
     if (match) {
       return {
         quantity: match[1],
@@ -571,11 +586,11 @@ export class RecipeScraper {
         name: match[3].trim()
       };
     }
-    
+
     // Try to extract fractional quantities like "1/2 cup flour"
     const fractionRegex = /^(\d+\/\d+|\d+\s+\d+\/\d+)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?)\s+(.+)/i;
     const fractionMatch = cleanText.match(fractionRegex);
-    
+
     if (fractionMatch) {
       return {
         quantity: fractionMatch[1],
@@ -583,18 +598,18 @@ export class RecipeScraper {
         name: fractionMatch[3].trim()
       };
     }
-    
+
     // Try to extract quantities without explicit units like "2 eggs"
     const simpleQtyRegex = /^(\d+(?:\/\d+)?(?:\.\d+)?)\s+(.+)/;
     const simpleMatch = cleanText.match(simpleQtyRegex);
-    
+
     if (simpleMatch) {
       return {
         quantity: simpleMatch[1],
         name: simpleMatch[2].trim()
       };
     }
-    
+
     // No quantity found, return just the name
     return {
       name: cleanText
@@ -688,14 +703,14 @@ export class RecipeScraper {
     const wprmIngredients = $('.wprm-recipe-ingredient, .wprm-recipe-ingredient-name, .wprm-recipe-ingredient-amount, .wprm-recipe-ingredient-unit');
     if (wprmIngredients.length > 0) {
       const ingredients: Array<{ name: string; quantity?: string; unit?: string; }> = [];
-      
+
       // Group ingredients by their parent container
       const ingredientGroups = new Map<string, any>();
-      
+
       wprmIngredients.each((_, element) => {
         const $element = $(element);
         const $parent = $element.closest('.wprm-recipe-ingredient');
-        
+
         if ($parent.length > 0) {
           const parentId = $parent.index();
           if (!ingredientGroups.has(parentId.toString())) {
@@ -705,9 +720,9 @@ export class RecipeScraper {
               name: ''
             });
           }
-          
+
           const group = ingredientGroups.get(parentId.toString());
-          
+
           if ($element.hasClass('wprm-recipe-ingredient-amount')) {
             group.amount = $element.text().trim();
           } else if ($element.hasClass('wprm-recipe-ingredient-unit')) {
@@ -724,7 +739,7 @@ export class RecipeScraper {
           }
         }
       });
-      
+
       // Process grouped ingredients
       for (const group of ingredientGroups.values()) {
         if (group.name && this.looksLikeIngredient(group.name)) {
@@ -736,12 +751,12 @@ export class RecipeScraper {
           ingredients.push(ingredient);
         }
       }
-      
+
       // Remove duplicates based on name
       const uniqueIngredients = ingredients.filter((ingredient, index, self) =>
         index === self.findIndex(other => other.name.toLowerCase() === ingredient.name.toLowerCase())
       );
-      
+
       if (uniqueIngredients.length > 0) {
         sections.push({
           sectionName: undefined,
@@ -757,7 +772,7 @@ export class RecipeScraper {
     ];
 
     for (const sectionSelector of possibleSections) {
-      $(sectionSelector).each((_, element) => {
+      $(sectionSelector).each((_, element)=> {
         const $section = $(element);
         const sectionTitle = $section.text().trim();
 
@@ -860,19 +875,19 @@ export class RecipeScraper {
 
   private static parseDuration(duration: string | undefined): string {
     if (!duration) return '';
-    
+
     // Handle ISO 8601 duration format (PT30M)
     if (duration.startsWith('PT')) {
       const hours = duration.match(/(\d+)H/);
       const minutes = duration.match(/(\d+)M/);
-      
+
       let result = '';
       if (hours) result += `${hours[1]}h `;
       if (minutes) result += `${minutes[1]}m`;
-      
+
       return result.trim();
     }
-    
+
     return duration;
   }
 
@@ -909,7 +924,7 @@ export class RecipeScraper {
     steps: Array<{ text: string; imageUrl?: string; }>;
   }> {
     if (!Array.isArray(instructions)) return [];
-    
+
     // Handle both flat array and nested object structures
     const processedInstructions = instructions.map(instruction => {
       if (typeof instruction === 'string') {
@@ -918,21 +933,21 @@ export class RecipeScraper {
           steps: [{ text: instruction }]
         };
       }
-      
+
       if (instruction.text) {
         return {
           sectionName: undefined,
           steps: [{ text: instruction.text }]
         };
       }
-      
+
       if (instruction.name) {
         return {
           sectionName: undefined,
           steps: [{ text: instruction.name }]
         };
       }
-      
+
       // Handle HowToStep objects
       if (instruction['@type'] === 'HowToStep') {
         return {
@@ -940,12 +955,12 @@ export class RecipeScraper {
           steps: [{ text: instruction.text || instruction.name || '' }]
         };
       }
-      
+
       // Handle HowToSection objects (most important fix)
       if (instruction['@type'] === 'HowToSection') {
         const sectionName = instruction.name || undefined;
         const steps = [];
-        
+
         if (instruction.itemListElement && Array.isArray(instruction.itemListElement)) {
           instruction.itemListElement.forEach(item => {
             if (item['@type'] === 'HowToStep' && (item.text || item.name)) {
@@ -953,16 +968,16 @@ export class RecipeScraper {
             }
           });
         }
-        
+
         return {
           sectionName,
           steps
         };
       }
-      
+
       return null;
     }).filter(Boolean);
-    
+
     // If we have multiple individual instructions, try to combine them intelligently
     if (processedInstructions.length > 1) {
       // Check if all are single steps - if so, combine them into one section
@@ -974,7 +989,7 @@ export class RecipeScraper {
         }];
       }
     }
-    
+
     return processedInstructions;
   }
 
@@ -1174,26 +1189,26 @@ export class RecipeScraper {
 
         // Filter ingredients to only include ones that look like ingredients (contain common measurements)
         const measurementPattern = /\b(\d+\/?\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\b/i;
-        
+
         const filteredIngredients = ingredients.filter((ingredient: string) => {
           // Skip very short strings
           if (ingredient.length < 3) return false;
-          
+
           // Check if it looks like an ingredient (contains measurement patterns or food keywords)
           const hasBasicMeasurement = measurementPattern.test(ingredient);
           const hasCommonIngredients = /\b(flour|sugar|salt|pepper|oil|butter|egg|milk|onion|garlic|chicken|beef|rice|pasta|tomato|cheese|bread|potato|carrot|celery|mushroom|spinach|herbs?|spices?|vanilla|chocolate|lemon|lime|orange|apple|banana|strawberry|blueberry|nuts?|almonds?|walnuts?|coconut|honey|maple|soy|sauce|vinegar|broth|stock|water|wine|beer|cream|yogurt|fish|salmon|tuna|shrimp|beans?|lentils?|chickpeas?|avocado|lettuce|basil|parsley|thyme|rosemary|oregano|paprika|cumin|ginger|cinnamon|nutmeg|cardamom|turmeric|sesame|peanut|cashew|pecan|pine|cranberry|raisin|date|fig|mango|pineapple|kiwi|grape|peach|plum|cherry|apricot|cucumber|zucchini|eggplant|bell|jalapeno|poblano|serrano|habanero|chipotle|cayenne|chili|hot|mild|sweet|sour|bitter|salty|savory|fresh|dried|ground|whole|chopped|diced|sliced|minced|grated|shredded|melted|softened|room|temperature|cold|frozen|canned|jarred|bottled|organic|free|range|grass|fed|wild|caught|extra|virgin|pure|natural|unsweetened|unsalted|low|fat|skim|whole|heavy|light|dark|white|brown|black|red|green|yellow|blue|purple|pink|orange)\b/i;
-          
+
           return hasBasicMeasurement || hasCommonIngredients;
         });
-        
+
         console.log(`Found ${filteredIngredients.length} valid ingredients from ${ingredients.length} total`);
-        
+
         if (filteredIngredients.length > 0) {
           return filteredIngredients;
         }
       }
     }
-    
+
     console.log(`No ingredients found with any method`);
     return [];
   }
