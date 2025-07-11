@@ -63,56 +63,53 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
     };
   };
 
-  // Helper function to scale ingredient quantities
+  // Helper function to format numbers as unicode fractions when possible
   const formatNumber = (num: number): string => {
     // Handle very small numbers (round to 0)
     if (num < 0.01) return '0';
-
-    // Convert common decimal values back to fractions
-    const fractionMap: { [key: string]: string } = {
-      '0.125': '⅛',
-      '0.25': '¼',
-      '0.33': '⅓',
-      '0.333': '⅓',
-      '0.375': '⅜',
-      '0.5': '½',
-      '0.625': '⅝',
-      '0.66': '⅔',
-      '0.667': '⅔',
-      '0.75': '¾',
-      '0.875': '⅞'
-    };
 
     const rounded = Math.round(num * 1000) / 1000;
     const decimalPart = rounded % 1;
     const wholePart = Math.floor(rounded);
 
-    // Check if the decimal part matches a known fraction
-    const decimalKey = decimalPart.toFixed(3);
-    if (fractionMap[decimalKey]) {
-      return wholePart > 0 ? `${wholePart}${fractionMap[decimalKey]}` : fractionMap[decimalKey];
+    // Convert common decimal values to unicode fractions
+    const fractionMap: { [key: number]: string } = {
+      0.125: '⅛',
+      0.25: '¼',
+      0.375: '⅜',
+      0.5: '½',
+      0.625: '⅝',
+      0.75: '¾',
+      0.875: '⅞',
+      [1/3]: '⅓',
+      [2/3]: '⅔',
+      [1/6]: '⅙',
+      [5/6]: '⅚'
+    };
+
+    // Find the closest fraction match
+    let closestFraction = '';
+    let smallestDiff = Infinity;
+    
+    for (const [decimal, fraction] of Object.entries(fractionMap)) {
+      const diff = Math.abs(decimalPart - parseFloat(decimal));
+      if (diff < 0.01 && diff < smallestDiff) {
+        smallestDiff = diff;
+        closestFraction = fraction;
+      }
     }
 
-    // Check for other common fractions
-    if (Math.abs(decimalPart - 1/3) < 0.01) {
-      return wholePart > 0 ? `${wholePart}⅓` : '⅓';
-    }
-    if (Math.abs(decimalPart - 2/3) < 0.01) {
-      return wholePart > 0 ? `${wholePart}⅔` : '⅔';
-    }
-    if (Math.abs(decimalPart - 1/8) < 0.01) {
-      return wholePart > 0 ? `${wholePart}⅛` : '⅛';
-    }
-    if (Math.abs(decimalPart - 5/8) < 0.01) {
-      return wholePart > 0 ? `${wholePart}⅝` : '⅝';
+    if (closestFraction) {
+      return wholePart > 0 ? `${wholePart}${closestFraction}` : closestFraction;
     }
 
-    // If no exact fraction match, show as decimal but round to reasonable precision
+    // If no fraction match, show as decimal but round to reasonable precision
     if (decimalPart < 0.01) {
       return wholePart.toString();
     }
 
-    return rounded.toString();
+    // Round to 2 decimal places for display
+    return Math.round(rounded * 100) / 100 + '';
   };
 
   // Helper function to scale ingredient quantities
