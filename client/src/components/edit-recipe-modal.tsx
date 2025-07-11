@@ -461,6 +461,27 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
               </div>
 
               <div>
+                <Label htmlFor="imageUrl">Recipe Image URL</Label>
+                <Input
+                  id="imageUrl"
+                  {...register("imageUrl")}
+                  placeholder="https://example.com/recipe-image.jpg"
+                />
+                {recipe.imageUrl && (
+                  <div className="mt-2">
+                    <img 
+                      src={recipe.imageUrl} 
+                      alt="Recipe preview"
+                      className="w-32 h-32 object-cover rounded-lg"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <Label>Ingredients *</Label>
                 <div className="flex items-center justify-between mb-4">
                   <Button
