@@ -406,47 +406,140 @@ export class RecipeScraper {
   private static extractInstructionsAdvanced($: cheerio.CheerioAPI): string[] {
     console.log("Starting advanced instruction extraction...");
     const instructions: string[] = [];
+    const seenTexts = new Set<string>(); // Prevent duplicates
   
-    // 1. Look for numbered steps in paragraphs and divs
-    $('p, div').each((_, el) => {
-      const text = $(el).text().trim();
-      if (/^\d+\.\s/.test(text) && text.length > 20 && text.length < 1000) {
-        instructions.push(text);
-      }
-    });
-  
-    // 2. Look for instruction sections based on headings
-    $('h1, h2, h3, h4, h5, h6, strong, b').each((_, el) => {
-      const $heading = $(el);
-      const headingText = $heading.text().trim().toLowerCase();
-  
-      if (/(instructions?|method|directions?|steps?)/.test(headingText)) {
-        let $next = $heading.next();
-        let attempts = 0;
-  
-        while ($next.length && attempts < 5) {
-          attempts++;
-          const nextText = $next.text().trim();
-  
-          if (nextText.length > 20 && nextText.length < 1000) {
-            instructions.push(nextText);
+    // 1. Look for content in the post/entry content area first
+    const contentSelectors = [
+      '.post-content', '.entry-content', '.content', '.recipe-content',
+      '.post-body', '.article-content', '.main-content'
+    ];
+    
+    for (const contentSelector of contentSelectors) {
+      const $content = $(contentSelector);
+      if ($content.length) {
+        console.log(`Found content area: ${contentSelector}`);
+        
+        // Look for paragraphs with cooking instructions
+        $content.find('p').each((_, el) => {
+          const text = $(el).text().trim();
+          if (text.length > 30 && text.length < 1000 && !seenTexts.has(text)) {
+            const hasActionWords = /\b(heat|cook|add|mix|stir|bake|place|remove|season|serve|combine|wash|wrap|allow|cool|grate|transfer|top with|spread|until|minutes?|hours?|degrees?)\b/i.test(text);
+            if (hasActionWords) {
+              instructions.push(text);
+              seenTexts.add(text);
+              console.log(`Found instruction paragraph: ${text.substring(0, 50)}...`);
+            }
           }
+        });
+        
+        // Look for list items within content
+        $content.find('ol li, ul li').each((_, el) => {
+          const text = $(el).text().trim();
+          if (text.length > 20 && text.length < 1000 && !seenTexts.has(text)) {
+            instructions.push(text);
+            seenTexts.add(text);
+            console.log(`Found instruction list item: ${text.substring(0, 50)}...`);
+          }
+        });
+        
+        if (instructions.length > 0) break; // Stop if we found instructions in this content area
+      }
+    }
   
-          $next = $next.next();
+    // 2. If no instructions found in content areas, look for numbered steps anywhere
+    if (instructions.length === 0) {
+      $('p, div').each((_, el) => {
+        const text = $(el).text().trim();
+        if (/^\d+\.\s/.test(text) && text.length > 20 && text.length < 1000 && !seenTexts.has(text)) {
+          instructions.push(text);
+          seenTexts.add(text);
         }
-      }
-    });
+      });
+    }
   
-    // 3. Look for content in lists
-    $('ol li, ul li').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text.length > 20 && text.length < 1000) {
-        instructions.push(text);
-      }
-    });
+    // 3. Look for instruction sections based on headings
+    if (instructions.length === 0) {
+      $('h1, h2, h3, h4, h5, h6, strong, b').each((_, el) => {
+        const $heading = $(el);
+        const headingText = $heading.text().trim().toLowerCase();
+  
+        if (/(instructions?|method|directions?|steps?|preparation)/.test(headingText)) {
+          let $next = $heading.next();
+          let attempts = 0;
+  
+          while ($next.length && attempts < 10) {
+            attempts++;
+            
+            if ($next.is('p, div')) {
+              const nextText = $next.text().trim();
+              if (nextText.length > 20 && nextText.length < 1000 && !seenTexts.has(nextText)) {
+                instructions.push(nextText);
+                seenTexts.add(nextText);
+              }
+            } else if ($next.is('ol, ul')) {
+              $next.find('li').each((_, li) => {
+                const liText = $(li).text().trim();
+                if (liText.length > 20 && liText.length < 1000 && !seenTexts.has(liText)) {
+                  instructions.push(liText);
+                  seenTexts.add(liText);
+                }
+              });
+            }
+  
+            $next = $next.next();
+          }
+        }
+      });
+    }
   
     console.log(`Found ${instructions.length} instructions via advanced extraction`);
     return instructions;
+  }
+
+  private static parseIngredientText(ingredientText: string): { name: string; quantity?: string; unit?: string; } {
+    // Clean up the text
+    const cleanText = ingredientText.trim().replace(/^\d+\.\s*/, ''); // Remove numbering
+    
+    // Common measurement patterns
+    const measurementRegex = /^(\d+(?:\/\d+)?(?:\.\d+)?)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)\s+(.+)/i;
+    
+    const match = cleanText.match(measurementRegex);
+    
+    if (match) {
+      return {
+        quantity: match[1],
+        unit: match[2],
+        name: match[3].trim()
+      };
+    }
+    
+    // Try to extract fractional quantities like "1/2 cup flour"
+    const fractionRegex = /^(\d+\/\d+|\d+\s+\d+\/\d+)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?)\s+(.+)/i;
+    const fractionMatch = cleanText.match(fractionRegex);
+    
+    if (fractionMatch) {
+      return {
+        quantity: fractionMatch[1],
+        unit: fractionMatch[2],
+        name: fractionMatch[3].trim()
+      };
+    }
+    
+    // Try to extract quantities without explicit units like "2 eggs"
+    const simpleQtyRegex = /^(\d+(?:\/\d+)?(?:\.\d+)?)\s+(.+)/;
+    const simpleMatch = cleanText.match(simpleQtyRegex);
+    
+    if (simpleMatch) {
+      return {
+        quantity: simpleMatch[1],
+        name: simpleMatch[2].trim()
+      };
+    }
+    
+    // No quantity found, return just the name
+    return {
+      name: cleanText
+    };
   }
 
   private static extractInstructionsWithImages($: cheerio.CheerioAPI, instructions: string[], baseUrl: string): Array<{ text: string; imageUrl?: string }> {
@@ -634,6 +727,113 @@ export class RecipeScraper {
     }
 
     return sections;
+  }
+
+  private static parseDuration(duration: string | undefined): string {
+    if (!duration) return '';
+    
+    // Handle ISO 8601 duration format (PT30M)
+    if (duration.startsWith('PT')) {
+      const hours = duration.match(/(\d+)H/);
+      const minutes = duration.match(/(\d+)M/);
+      
+      let result = '';
+      if (hours) result += `${hours[1]}h `;
+      if (minutes) result += `${minutes[1]}m`;
+      
+      return result.trim();
+    }
+    
+    return duration;
+  }
+
+  private static parseServings(servings: any): number {
+    if (typeof servings === 'number') return servings;
+    if (typeof servings === 'string') {
+      const match = servings.match(/\d+/);
+      return match ? parseInt(match[0]) : 1;
+    }
+    return 1;
+  }
+
+  private static parseImage(image: any): string {
+    if (typeof image === 'string') return image;
+    if (Array.isArray(image) && image.length > 0) {
+      return typeof image[0] === 'string' ? image[0] : image[0].url || '';
+    }
+    if (image && typeof image === 'object') {
+      return image.url || image.contentUrl || '';
+    }
+    return '';
+  }
+
+  private static parseCategory(category: any): string {
+    if (typeof category === 'string') return category;
+    if (Array.isArray(category) && category.length > 0) {
+      return typeof category[0] === 'string' ? category[0] : '';
+    }
+    return '';
+  }
+
+  private static parseInstructions(instructions: any[]): string[] {
+    if (!Array.isArray(instructions)) return [];
+    
+    return instructions.map(instruction => {
+      if (typeof instruction === 'string') return instruction;
+      if (instruction.text) return instruction.text;
+      if (instruction.name) return instruction.name;
+      return '';
+    }).filter(Boolean);
+  }
+
+  private static extractServingsFromText(text: string): number | null {
+    const servingsPatterns = [
+      /serves?\s+(\d+)/i,
+      /servings?\s*:?\s*(\d+)/i,
+      /yields?\s+(\d+)/i,
+      /makes?\s+(\d+)/i,
+      /for\s+(\d+)\s+people/i,
+    ];
+
+    for (const pattern of servingsPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        return parseInt(match[1]);
+      }
+    }
+
+    return null;
+  }
+
+  private static extractVideoUrl($: cheerio.CheerioAPI): string {
+    // Look for YouTube embeds
+    const iframes = $('iframe[src*="youtube"], iframe[src*="youtu.be"]');
+    if (iframes.length > 0) {
+      const src = iframes.first().attr('src');
+      if (src) return src;
+    }
+
+    // Look for video elements
+    const videos = $('video source, video');
+    if (videos.length > 0) {
+      const src = videos.first().attr('src');
+      if (src) return src;
+    }
+
+    return '';
+  }
+
+  private static extractImageBySelectors($: cheerio.CheerioAPI, selectors: string[], baseUrl: string): string {
+    for (const selector of selectors) {
+      const img = $(selector).first();
+      if (img.length) {
+        const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
+        if (src) {
+          return src.startsWith('http') ? src : new URL(src, baseUrl).href;
+        }
+      }
+    }
+    return '';
   }
 
   private static looksLikeIngredient(text: string): boolean {
