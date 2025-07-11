@@ -27,6 +27,42 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
     }
   }, [open]);
 
+  // Helper function to parse ingredient text into components
+  const parseIngredientText = (text: string): { name: string; quantity?: string; unit?: string } => {
+    const cleanText = text.trim();
+    
+    // Common units pattern
+    const unitPattern = /\b(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\b/i;
+    
+    // Try to match: quantity + unit + ingredient
+    const fullPattern = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?(?:\s*\d+(?:\s*\/\s*\d+)?)*|\d*[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\s+(.+)/i;
+    
+    // Try to match: quantity + ingredient (no unit)
+    const quantityPattern = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?(?:\s*\d+(?:\s*\/\s*\d+)?)*|\d*[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])\s+(.+)/;
+    
+    const fullMatch = cleanText.match(fullPattern);
+    if (fullMatch) {
+      return {
+        quantity: fullMatch[1].trim(),
+        unit: fullMatch[2].trim(),
+        name: fullMatch[3].trim()
+      };
+    }
+    
+    const quantityMatch = cleanText.match(quantityPattern);
+    if (quantityMatch) {
+      return {
+        quantity: quantityMatch[1].trim(),
+        name: quantityMatch[2].trim()
+      };
+    }
+    
+    // No quantity found, return as is
+    return {
+      name: cleanText
+    };
+  };
+
   // Helper function to scale ingredient quantities
   const scaleIngredientItem = (item: { name: string; quantity?: string; unit?: string }, multiplier: number): string => {
     const { name, quantity, unit } = item;
@@ -455,16 +491,20 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
               <div className="space-y-4">
                 {Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0 && (
                   typeof recipe.ingredients[0] === 'string' 
-                    ? // Legacy format: array of strings
-                      recipe.ingredients.map((ingredient, index) => (
-                        <div key={index} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                          <input
-                            type="checkbox"
-                            className="rounded border-gray-300 text-primary focus:ring-primary"
-                          />
-                          <span className="flex-1">{ingredient}</span>
-                        </div>
-                      ))
+                    ? // Legacy format: array of strings - parse them into proper format
+                      recipe.ingredients.map((ingredient, index) => {
+                        const parsed = parseIngredientText(ingredient);
+                        const scaled = scaleIngredientItem(parsed, portionMultiplier);
+                        return (
+                          <div key={index} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span className="flex-1">{scaled}</span>
+                          </div>
+                        );
+                      })
                     : // New format: array of sections with items
                       recipe.ingredients.map((section, sectionIndex) => (
                         <div key={sectionIndex}>
