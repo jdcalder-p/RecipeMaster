@@ -83,8 +83,12 @@ export class FirebaseStorage implements IStorage {
   async createRecipe(recipe: InsertRecipe, userId: string): Promise<Recipe> {
     try {
       const id = nanoid();
+      
+      // Clean up the recipe data to remove undefined values
+      const cleanedRecipe = this.cleanRecipeData(recipe);
+      
       const recipeData = {
-        ...recipe,
+        ...cleanedRecipe,
         userId,
         createdAt: new Date(),
       };
@@ -108,7 +112,11 @@ export class FirebaseStorage implements IStorage {
         throw new Error('Recipe not found or access denied');
       }
 
-      await recipeRef.update(recipe);
+      // Clean the partial recipe data
+      const cleanedRecipe = recipe as InsertRecipe;
+      const cleanedUpdate = this.cleanRecipeData(cleanedRecipe);
+
+      await recipeRef.update(cleanedUpdate);
       
       const updatedDoc = await recipeRef.get();
       return { id: updatedDoc.id, ...updatedDoc.data() } as Recipe;
@@ -380,6 +388,44 @@ export class FirebaseStorage implements IStorage {
       console.error('Error generating shopping list from meal plan:', error);
       return [];
     }
+  }
+
+  private cleanRecipeData(recipe: InsertRecipe): InsertRecipe {
+    // Clean ingredients sections
+    const cleanedIngredients = recipe.ingredients.map(section => ({
+      ...(section.sectionName !== undefined && { sectionName: section.sectionName }),
+      items: section.items.map(item => ({
+        name: item.name,
+        ...(item.quantity !== undefined && { quantity: item.quantity }),
+        ...(item.unit !== undefined && { unit: item.unit }),
+      }))
+    }));
+
+    // Clean instructions sections
+    const cleanedInstructions = recipe.instructions.map(section => ({
+      ...(section.sectionName !== undefined && { sectionName: section.sectionName }),
+      steps: section.steps.map(step => ({
+        text: step.text,
+        ...(step.imageUrl !== undefined && { imageUrl: step.imageUrl }),
+      }))
+    }));
+
+    // Return cleaned recipe with only defined values
+    return {
+      title: recipe.title,
+      ...(recipe.description !== undefined && { description: recipe.description }),
+      ...(recipe.cookTime !== undefined && { cookTime: recipe.cookTime }),
+      ...(recipe.servings !== undefined && { servings: recipe.servings }),
+      ...(recipe.category !== undefined && { category: recipe.category }),
+      ...(recipe.difficulty !== undefined && { difficulty: recipe.difficulty }),
+      rating: recipe.rating,
+      ...(recipe.imageUrl !== undefined && { imageUrl: recipe.imageUrl }),
+      ingredients: cleanedIngredients,
+      instructions: cleanedInstructions,
+      ...(recipe.sourceUrl !== undefined && { sourceUrl: recipe.sourceUrl }),
+      ...(recipe.videoUrl !== undefined && { videoUrl: recipe.videoUrl }),
+      isFavorite: recipe.isFavorite,
+    };
   }
 
   private categorizeIngredient(ingredient: string): string {
