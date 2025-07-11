@@ -188,42 +188,41 @@ export class RecipeScraper {
         const lowerIng = ingredient.toLowerCase();
         let assigned = false;
 
-        // Paste ingredients (for tangzhong/starter)
-        if (lowerIng.includes('bread flour') && lowerIng.includes('1/3') && lowerIng.includes('c')) {
-          pasteIngredients.push(ingredient);
-          assigned = true;
-        } else if ((lowerIng.includes('milk') && lowerIng.includes('1/3')) ||
-                   (lowerIng.includes('hot') && lowerIng.includes('water'))) {
+        // Paste ingredients (for tangzhong/starter) - more specific matching
+        if ((lowerIng.includes('bread flour') && (lowerIng.includes('1/3') || lowerIng.includes('⅓'))) ||
+            (lowerIng.includes('milk') && (lowerIng.includes('1/3') || lowerIng.includes('⅓')) && !lowerIng.includes('2/3') && !lowerIng.includes('⅔')) ||
+            (lowerIng.includes('hot') && (lowerIng.includes('water') || lowerIng.includes('tap water'))) ||
+            (lowerIng.includes('water') && lowerIng.includes('1/2') && lowerIng.includes('c'))) {
           pasteIngredients.push(ingredient);
           assigned = true;
         }
         
-        // Main rolls ingredients
+        // Main rolls ingredients - more comprehensive matching
         else if (lowerIng.includes('yeast') || 
-                 (lowerIng.includes('milk') && (lowerIng.includes('2/3') || lowerIng.includes('warm'))) ||
-                 lowerIng.includes('sugar') && !lowerIng.includes('brown') && !lowerIng.includes('powder') ||
-                 (lowerIng.includes('butter') && lowerIng.includes('melt')) ||
-                 lowerIng.includes('egg') && !lowerIng.includes('yolk') ||
-                 lowerIng.includes('salt') && !lowerIng.includes('salted') ||
-                 (lowerIng.includes('bread flour') && lowerIng.includes('3')) ||
-                 (lowerIng.includes('cream') && lowerIng.includes('heavy') && lowerIng.includes('pour'))) {
+                 (lowerIng.includes('milk') && (lowerIng.includes('2/3') || lowerIng.includes('⅔') || lowerIng.includes('warm') || lowerIng.includes('100'))) ||
+                 (lowerIng.includes('sugar') && !lowerIng.includes('brown') && !lowerIng.includes('powder') && lowerIng.includes('1/2')) ||
+                 (lowerIng.includes('butter') && (lowerIng.includes('melt') || lowerIng.includes('3') || lowerIng.includes('tbsp'))) ||
+                 (lowerIng.includes('egg') && !lowerIng.includes('yolk') && lowerIng.includes('1')) ||
+                 (lowerIng.includes('salt') && !lowerIng.includes('salted') && lowerIng.includes('1') && lowerIng.includes('tsp')) ||
+                 (lowerIng.includes('bread flour') && (lowerIng.includes('3') || lowerIng.includes('2/3'))) ||
+                 (lowerIng.includes('cream') && lowerIng.includes('heavy') && (lowerIng.includes('pour') || lowerIng.includes('whip')))) {
           rollsIngredients.push(ingredient);
           assigned = true;
         }
         
-        // Cinnamon filling ingredients
+        // Cinnamon filling ingredients - more specific matching
         else if ((lowerIng.includes('brown sugar') && lowerIng.includes('packed')) ||
-                 lowerIng.includes('cinnamon') && !lowerIng.includes('roll') ||
+                 (lowerIng.includes('cinnamon') && !lowerIng.includes('roll') && lowerIng.includes('2') && lowerIng.includes('tbsp')) ||
                  (lowerIng.includes('butter') && lowerIng.includes('softened') && lowerIng.includes('8'))) {
           fillingIngredients.push(ingredient);
           assigned = true;
         }
         
-        // Icing ingredients
+        // Icing ingredients - more comprehensive matching  
         else if ((lowerIng.includes('butter') && lowerIng.includes('1/3') && lowerIng.includes('c')) ||
-                 lowerIng.includes('cream cheese') ||
-                 lowerIng.includes('powdered sugar') ||
-                 lowerIng.includes('vanilla')) {
+                 (lowerIng.includes('cream cheese') && lowerIng.includes('softened')) ||
+                 (lowerIng.includes('powdered sugar') && lowerIng.includes('2') && lowerIng.includes('c')) ||
+                 (lowerIng.includes('vanilla') && lowerIng.includes('1/2') && lowerIng.includes('tbsp'))) {
           icingIngredients.push(ingredient);
           assigned = true;
         }
@@ -236,26 +235,26 @@ export class RecipeScraper {
       // Create sections with proper names
       if (pasteIngredients.length > 0) {
         structuredIngredients.push({
-          sectionName: "For the Paste (Tangzhong)",
+          sectionName: "Paste",
           items: pasteIngredients.map((ing: string) => {
             const parsed = this.parseIngredientText(ing);
             parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
             return parsed;
           })
         });
-        console.log(`🏗️ Created "For the Paste" section with ${pasteIngredients.length} ingredients`);
+        console.log(`🏗️ Created "Paste" section with ${pasteIngredients.length} ingredients`);
       }
 
       if (rollsIngredients.length > 0) {
         structuredIngredients.push({
-          sectionName: "For the Rolls",
+          sectionName: "Rolls",
           items: rollsIngredients.map((ing: string) => {
             const parsed = this.parseIngredientText(ing);
             parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
             return parsed;
           })
         });
-        console.log(`🏗️ Created "For the Rolls" section with ${rollsIngredients.length} ingredients`);
+        console.log(`🏗️ Created "Rolls" section with ${rollsIngredients.length} ingredients`);
       }
 
       if (fillingIngredients.length > 0) {
