@@ -1268,23 +1268,31 @@ export class RecipeScraper {
 
     // Special case for very short but valid ingredients like "1 Yolk", "Salt", "Pepper"
     const shortValidIngredients = /^\d+\s+(yolk|yolks|egg|eggs|clove|cloves|cup|cups|tbsp|tsp|oz|lb)\b/i;
-    const singleWordIngredients = /^(salt|pepper|sugar|flour|butter|oil|water|milk|cream|vanilla|yeast|baking|powder|soda)$/i;
+    const singleWordIngredients = /^(salt|pepper|sugar|flour|butter|oil|water|milk|cream|vanilla|yeast|baking|powder|soda|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|cornstarch|flour|starch)$/i;
     
-    if (shortValidIngredients.test(text) || singleWordIngredients.test(text)) {
+    // Special case for pinch measurements and "as needed" ingredients
+    const pinchIngredients = /^(pinch|dash)\s+of\s+\w+/i;
+    const asNeededIngredients = /\b(as needed|to taste)\b/i;
+    
+    if (shortValidIngredients.test(text) || singleWordIngredients.test(text) || pinchIngredients.test(text) || asNeededIngredients.test(text)) {
       return true;
     }
 
     // Check if text looks like an ingredient (contains measurements, common ingredient words)
-    const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b)\b/i;
-    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced|white|sharp|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|cream cheese|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed|yolk|yolks)\b/i;
+    const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b|pinch|dash|handful)\b/i;
+    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced|white|sharp|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|cream cheese|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed|yolk|yolks|wine|port|rum|brandy|whiskey|vodka|beer|sherry|champagne|cognac|liqueur|raisins|cornstarch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|starch|arrowroot)\b/i;
 
     // Special case for numbered items that look like ingredients (e.g., "4 large russet potatoes")
-    const numberedIngredientPattern = /^\d+\s+(large|medium|small|whole|fresh|dried)?\s*(russet|yukon|red|white|sweet)?\s*(potato|potatoes|onion|onions|carrot|carrots|apple|apples|egg|eggs|yolk|yolks|clove|cloves|cup|cups|tbsp|tsp|oz|lb|pound|pounds)\b/i;
+    const numberedIngredientPattern = /^\d+\s+(large|medium|small|whole|fresh|dried)?\s*(russet|yukon|red|white|sweet|ruby|golden|dark|light)?\s*(potato|potatoes|onion|onions|carrot|carrots|apple|apples|egg|eggs|yolk|yolks|clove|cloves|cup|cups|tbsp|tsp|oz|lb|pound|pounds|wine|port|rum|brandy|raisins|nutmeg|cinnamon|cornstarch|starch)\b/i;
 
     // Special case for cheese types that might be mentioned in instructions
     const cheesePattern = /\b(cheddar|cheese|goat|parmesan|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed)\b/i;
+    
+    // Special case for alcohol and cooking ingredients
+    const alcoholPattern = /\b(wine|port|rum|brandy|whiskey|vodka|beer|sherry|champagne|cognac|liqueur|cooking wine|ruby port|white wine|red wine)\b/i;
+    const cookingPattern = /\b(cornstarch|arrowroot|flour|starch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|raisins|dried fruit)\b/i;
 
-    return measurementPattern.test(text) || ingredientWords.test(text) || numberedIngredientPattern.test(text) || cheesePattern.test(text);
+    return measurementPattern.test(text) || ingredientWords.test(text) || numberedIngredientPattern.test(text) || cheesePattern.test(text) || alcoholPattern.test(text) || cookingPattern.test(text);
   }
 
   private static extractBySelectors($: cheerio.CheerioAPI, selectors: string[]): string {
