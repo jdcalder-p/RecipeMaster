@@ -187,9 +187,13 @@ export class RecipeScraper {
       for (const ingredient of uniqueIngredients) {
         const lowerIng = ingredient.toLowerCase();
         let assigned = false;
+        console.log(`🔍 Processing ingredient: "${ingredient}"`);
+        console.log(`🔍 Lowercase version: "${lowerIng}"`);
 
-        // Special case for the main bread flour ingredient
-        if (lowerIng.includes('3 2/3') && lowerIng.includes('bread flour')) {
+        // Special case for the main bread flour ingredient - check for various formats
+        if (lowerIng.includes('bread flour') && 
+           (lowerIng.includes('3 2/3') || lowerIng.includes('3⅔') || /3\s*2\/3/.test(lowerIng) || 
+            lowerIng.includes('3.67') || lowerIng.includes('3.66'))) {
           rollsIngredients.push(ingredient);
           assigned = true;
         }
@@ -209,7 +213,7 @@ export class RecipeScraper {
                  (lowerIng.includes('butter') && (lowerIng.includes('melt') || lowerIng.includes('3') || lowerIng.includes('tbsp'))) ||
                  (lowerIng.includes('egg') && !lowerIng.includes('yolk') && lowerIng.includes('1')) ||
                  (lowerIng.includes('salt') && !lowerIng.includes('salted') && lowerIng.includes('1') && lowerIng.includes('tsp')) ||
-                 (lowerIng.includes('bread flour') && (lowerIng.includes('3') || lowerIng.includes('2/3') || /3\s*2\/3/.test(lowerIng) || /3\s+2\/3/.test(lowerIng) || lowerIng.includes('3 2/3'))) ||
+                 (lowerIng.includes('bread flour') && (lowerIng.includes('3') || lowerIng.includes('2/3') || /3\s*2\/3/.test(lowerIng) || /3\s+2\/3/.test(lowerIng) || lowerIng.includes('3 2/3') || lowerIng.includes('3⅔'))) ||
                  (lowerIng.includes('cream') && lowerIng.includes('heavy') && (lowerIng.includes('pour') || lowerIng.includes('whip')))) {
           rollsIngredients.push(ingredient);
           assigned = true;
@@ -224,7 +228,7 @@ export class RecipeScraper {
         }
         
         // Icing ingredients - more comprehensive matching  
-        else if ((lowerIng.includes('butter') && lowerIng.includes('1/3') && lowerIng.includes('c')) ||
+        else if ((lowerIng.includes('butter') && (lowerIng.includes('1/3') || lowerIng.includes('⅓')) && (lowerIng.includes('c') || lowerIng.includes('cup'))) ||
                  (lowerIng.includes('cream cheese') && lowerIng.includes('softened')) ||
                  (lowerIng.includes('powdered sugar') && lowerIng.includes('2') && lowerIng.includes('c')) ||
                  (lowerIng.includes('vanilla') && lowerIng.includes('1/2') && lowerIng.includes('tbsp'))) {
