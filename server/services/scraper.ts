@@ -113,7 +113,9 @@ export class RecipeScraper {
       return ing;
     });
 
-    const instructions = this.parseInstructions(recipe.recipeInstructions || []);
+    let instructions = this.parseInstructions(recipe.recipeInstructions || []);
+    console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
+    console.log(`📋 JSON-LD INSTRUCTIONS PARSED:`, instructions);
 
     const cookTime = this.parseDuration(recipe.cookTime || recipe.totalTime);
     let servings = this.parseServings(recipe.recipeYield);
@@ -775,15 +777,59 @@ export class RecipeScraper {
     return '';
   }
 
-  private static parseInstructions(instructions: any[]): string[] {
+  private static parseInstructions(instructions: any[]): Array<{
+    sectionName?: string;
+    steps: Array<{ text: string; imageUrl?: string; }>;
+  }> {
     if (!Array.isArray(instructions)) return [];
     
-    return instructions.map(instruction => {
-      if (typeof instruction === 'string') return instruction;
-      if (instruction.text) return instruction.text;
-      if (instruction.name) return instruction.name;
-      return '';
+    // Handle both flat array and nested object structures
+    const processedInstructions = instructions.map(instruction => {
+      if (typeof instruction === 'string') {
+        return {
+          sectionName: undefined,
+          steps: [{ text: instruction }]
+        };
+      }
+      
+      if (instruction.text) {
+        return {
+          sectionName: undefined,
+          steps: [{ text: instruction.text }]
+        };
+      }
+      
+      if (instruction.name) {
+        return {
+          sectionName: undefined,
+          steps: [{ text: instruction.name }]
+        };
+      }
+      
+      // Handle HowToStep objects
+      if (instruction['@type'] === 'HowToStep') {
+        return {
+          sectionName: undefined,
+          steps: [{ text: instruction.text || instruction.name || '' }]
+        };
+      }
+      
+      return null;
     }).filter(Boolean);
+    
+    // If we have multiple individual instructions, try to combine them intelligently
+    if (processedInstructions.length > 1) {
+      // Check if all are single steps - if so, combine them into one section
+      const allSingleSteps = processedInstructions.every(inst => inst.steps.length === 1);
+      if (allSingleSteps) {
+        return [{
+          sectionName: undefined,
+          steps: processedInstructions.map(inst => inst.steps[0])
+        }];
+      }
+    }
+    
+    return processedInstructions;
   }
 
   private static extractServingsFromText(text: string): number | null {
