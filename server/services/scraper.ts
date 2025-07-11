@@ -271,6 +271,8 @@ export class RecipeScraper {
         '.entry-summary',
       ],
       ingredients: [
+        '.wprm-recipe-ingredient',
+        '.wprm-recipe-ingredient-name',
         '.recipe-ingredient',
         '.ingredients li',
         '[class*="ingredient"]',
@@ -280,12 +282,18 @@ export class RecipeScraper {
         '.recipe-ingredients .ingredient',
         '.ingredient-list li',
         '.ingredients-list li',
+        '.wprm-recipe-ingredients li',
+        '.wprm-recipe-ingredients .wprm-recipe-ingredient',
         '.recipe-instructions li:contains("cup"):contains("tbsp"):contains("tsp")',
         '.entry-content li:contains("cup")',
         '.entry-content li:contains("tbsp")',
         '.entry-content li:contains("tsp")',
         '.entry-content ul li',
         'ul li',
+        // Add specific selectors for numbered ingredients
+        'li:contains("4")',
+        'li:contains("potato")',
+        'li:contains("potatoes")',
       ],
       instructions: [
         '.wprm-recipe-instruction-text span',
@@ -1050,10 +1058,9 @@ export class RecipeScraper {
       /\?\s*$/, // Ends with question mark
       /\b(adding|substitute|replace|instead|alternative|option|variation|different|best|type|kind|brand|store|buy|purchase|find|where|when|traditional|regular|mix|combination|profile|enhance|flavor|mellow|blend|beautifully)\b/i,
       /\b(sharp|white|cheddar|cheese|traditionally|used|because|adds|tangy|creamy|even|also|can|be|for|a|different|flavor|profile)\b.*\b(sharp|white|cheddar|cheese|traditionally|used|because|adds|tangy|creamy|even|also|can|be|for|a|different|flavor|profile)\b/i,
-      /\b(absolutely|adding|minced|garlic|potato|mixture|enhance|overall|sauté|with|shallots|bit|butter|before|mixing|into|potatoes|mellow|sharpness|blend|beautifully|other|ingredients)\b/i,
     ];
 
-    // Check if text matches any exclude pattern
+    // Check if text matches any exclude pattern - but exclude the potato-specific pattern
     for (const pattern of excludePatterns) {
       if (pattern.test(text)) {
         return false;
@@ -1067,9 +1074,12 @@ export class RecipeScraper {
 
     // Check if text looks like an ingredient (contains measurements, common ingredient words)
     const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b)\b/i;
-    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|bacon|shallot|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced)\b/i;
+    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced)\b/i;
+    
+    // Special case for numbered items that look like ingredients (e.g., "4 large russet potatoes")
+    const numberedIngredientPattern = /^\d+\s+(large|medium|small|whole|fresh|dried)?\s*(russet|yukon|red|white|sweet)?\s*(potato|potatoes|onion|onions|carrot|carrots|apple|apples|egg|eggs|clove|cloves|cup|cups|tbsp|tsp|oz|lb|pound|pounds)\b/i;
 
-    return measurementPattern.test(text) || ingredientWords.test(text);
+    return measurementPattern.test(text) || ingredientWords.test(text) || numberedIngredientPattern.test(text);
   }
 
   private static extractBySelectors($: cheerio.CheerioAPI, selectors: string[]): string {
@@ -1187,18 +1197,15 @@ export class RecipeScraper {
           return ing;
         });
 
-        // Filter ingredients to only include ones that look like ingredients (contain common measurements)
+        // Filter ingredients to only include ones that look like ingredients
         const measurementPattern = /\b(\d+\/?\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\b/i;
 
         const filteredIngredients = ingredients.filter((ingredient: string) => {
           // Skip very short strings
           if (ingredient.length < 3) return false;
 
-          // Check if it looks like an ingredient (contains measurement patterns or food keywords)
-          const hasBasicMeasurement = measurementPattern.test(ingredient);
-          const hasCommonIngredients = /\b(flour|sugar|salt|pepper|oil|butter|egg|milk|onion|garlic|chicken|beef|rice|pasta|tomato|cheese|bread|potato|carrot|celery|mushroom|spinach|herbs?|spices?|vanilla|chocolate|lemon|lime|orange|apple|banana|strawberry|blueberry|nuts?|almonds?|walnuts?|coconut|honey|maple|soy|sauce|vinegar|broth|stock|water|wine|beer|cream|yogurt|fish|salmon|tuna|shrimp|beans?|lentils?|chickpeas?|avocado|lettuce|basil|parsley|thyme|rosemary|oregano|paprika|cumin|ginger|cinnamon|nutmeg|cardamom|turmeric|sesame|peanut|cashew|pecan|pine|cranberry|raisin|date|fig|mango|pineapple|kiwi|grape|peach|plum|cherry|apricot|cucumber|zucchini|eggplant|bell|jalapeno|poblano|serrano|habanero|chipotle|cayenne|chili|hot|mild|sweet|sour|bitter|salty|savory|fresh|dried|ground|whole|chopped|diced|sliced|minced|grated|shredded|melted|softened|room|temperature|cold|frozen|canned|jarred|bottled|organic|free|range|grass|fed|wild|caught|extra|virgin|pure|natural|unsweetened|unsalted|low|fat|skim|whole|heavy|light|dark|white|brown|black|red|green|yellow|blue|purple|pink|orange)\b/i;
-
-          return hasBasicMeasurement || hasCommonIngredients;
+          // Use the looksLikeIngredient helper function for consistent filtering
+          return this.looksLikeIngredient(ingredient);
         });
 
         console.log(`Found ${filteredIngredients.length} valid ingredients from ${ingredients.length} total`);
