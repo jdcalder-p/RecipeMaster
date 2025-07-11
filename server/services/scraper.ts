@@ -179,7 +179,7 @@ export class RecipeScraper {
         }]
       : [];
 
-    
+
 
     // If instructions are empty or only contain section headers, create a fallback
     const processedInstructions = instructions.filter(Boolean);
@@ -420,7 +420,7 @@ export class RecipeScraper {
         parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
         return parsed;
       });
-      
+
       finalIngredients = [{ 
         items: this.removeDuplicateIngredientItems(parsedItems)
       }];
@@ -715,7 +715,7 @@ export class RecipeScraper {
           const img = images.eq(index);
           const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
           const alt = img.attr('alt') || '';
-          
+
           if (src && this.isValidRecipeImage(src, alt)) {
             imageUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
             console.log(`Found image for step ${stepNumber}: ${imageUrl}`);
@@ -731,7 +731,7 @@ export class RecipeScraper {
           const img = allImages.eq(index);
           const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
           const alt = img.attr('alt') || '';
-          
+
           if (src && this.isValidRecipeImage(src, alt)) {
             imageUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
             console.log(`Found fallback image for step ${stepNumber}: ${imageUrl}`);
@@ -955,22 +955,22 @@ export class RecipeScraper {
 
   private static parseImage(image: any): string {
     let imageUrl = '';
-    
+
     if (typeof image === 'string') {
       imageUrl = image;
     } else if (Array.isArray(image) && image.length > 0) {
       // Find the best quality image from array
       let bestImage = '';
-      
+
       for (const img of image) {
         let currentUrl = '';
-        
+
         if (typeof img === 'string') {
           currentUrl = img;
         } else if (img && typeof img === 'object') {
           currentUrl = img.url || img.contentUrl || '';
         }
-        
+
         if (currentUrl) {
           // Prefer high-resolution images
           if (currentUrl.includes('1080') || currentUrl.includes('large') || currentUrl.includes('full')) {
@@ -981,17 +981,17 @@ export class RecipeScraper {
           }
         }
       }
-      
+
       imageUrl = bestImage;
     } else if (image && typeof image === 'object') {
       imageUrl = image.url || image.contentUrl || '';
     }
-    
+
     // Only filter out obvious placeholder/invalid images
     if (imageUrl && imageUrl.includes('data:image/svg+xml')) {
       return '';
     }
-    
+
     console.log(`📷 EXTRACTED IMAGE URL: ${imageUrl}`);
     return imageUrl;
   }
@@ -1116,89 +1116,97 @@ export class RecipeScraper {
   }
 
   private static extractImageBySelectors($: cheerio.CheerioAPI, selectors: string[], baseUrl: string): string {
+    // Try multiple selectors for the main recipe image
     const imageSelectors = [
-      ...selectors,
-      // Common recipe image selectors
-      '.wp-post-image',
-      '.featured-image img',
+      'meta[property="og:image"]',
+      'meta[name="twitter:image"]',
+      '.wprm-recipe-image img',
       '.recipe-image img',
+      '.wp-recipe-card img',
+      '.recipe-hero img', 
       '.recipe-photo img',
+      '.featured-image img',
+      'img[alt*="recipe"]',
+      'img[class*="recipe"]',
+      'img[id*="recipe"]',
       '.entry-content img:first-of-type',
-      'article img:first-of-type',
-      '.post-thumbnail img',
-      // Look for high-quality images
-      'img[src*="1080"]',
-      'img[src*="large"]',
-      'img[src*="full"]',
-      // Look for content-related images
-      'img[src*="recipe"]',
-      'img[src*="food"]',
-      'img[src*="dish"]'
+      '.post-content img:first-of-type'
     ];
-    
+
     console.log(`🔍 Trying ${imageSelectors.length} image selectors...`);
-    
+
     // Try each selector
     for (const selector of imageSelectors) {
-      const imgs = $(selector);
-      if (imgs.length > 0) {
-        for (let i = 0; i < imgs.length; i++) {
-          const img = imgs.eq(i);
-          const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || img.attr('data-original');
-          
-          if (src && this.isValidImageUrl(src)) {
-            const fullUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
-            console.log(`✅ Found image with selector "${selector}": ${fullUrl}`);
-            return fullUrl;
+      const element = $(selector);
+      if (element.length > 0) {
+        let src = element.attr('content') || element.attr('src') || element.attr('data-src') || element.attr('data-lazy-src');
+
+        if (src && this.isValidImageUrl(src) && this.isValidRecipeImage(src)) {
+          // Convert relative URLs to absolute
+          if (!src.startsWith('http')) {
+            src = new URL(src, baseUrl).href;
           }
+
+          // Check if image seems to be reasonable size (not a tiny placeholder)
+          const width = element.attr('width');
+          const height = element.attr('height');
+          if (width && height) {
+            const w = parseInt(width);
+            const h = parseInt(height);
+            if (w < 100 || h < 100) {
+              console.log(`⚠️ Skipping small image (${w}x${h}): ${src}`);
+              continue;
+            }
+          }
+
+          console.log(`✅ Found image with selector "${selector}": ${src}`);
+          return src;
         }
       }
     }
-    
+
     // If no specific selector worked, try all images on page
     console.log(`🔍 Trying all images on page...`);
     const allImages = $('img');
-    
+
     for (let i = 0; i < allImages.length; i++) {
       const img = allImages.eq(i);
       const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || img.attr('data-original');
-      
+
       if (src && this.isValidImageUrl(src)) {
         const fullUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
         console.log(`✅ Found image from all images: ${fullUrl}`);
         return fullUrl;
       }
     }
-    
+
     console.log(`❌ No valid image found`);
     return '';
   }
 
   private static isValidImageUrl(src: string): boolean {
     if (!src) return false;
-    
-    // Filter out obvious non-images
-    if (src.includes('data:image/svg+xml') || 
+
+    // Filter out data URIs and placeholders
+    if (src.startsWith('data:') || 
         src.includes('placeholder') ||
-        src.includes('logo') ||
-        src.includes('icon') ||
-        src.includes('avatar')) {
+        src.includes('blank') ||
+        src.includes('spacer') ||
+        src.includes('1x1') ||
+        src.includes('pixel')) {
       return false;
     }
-    
-    // Must be a valid image extension or format
+
+    // Check for valid image extensions
     const imageExtensions = /\.(jpg|jpeg|png|gif|webp|avif)(\?|$)/i;
-    const hasImageExtension = imageExtensions.test(src);
-    
-    // Allow if it has image extension or contains image-like patterns
-    const imagePatterns = /\.(jpg|jpeg|png|gif|webp|avif)|image|photo|picture|wp-content/i;
-    
-    return hasImageExtension || imagePatterns.test(src);
+    const imagePatterns = /image|photo|picture|wp-content/i;
+
+    return imageExtensions.test(src) || imagePatterns.test(src);
   }
 
   private static isValidRecipeImage(src: string, alt: string = ''): boolean {
     if (!src) return false;
-    
+
     // Filter out obvious non-recipe images
     if (src.includes('data:image/gif') ||
         src.includes('data:image/svg+xml') || 
@@ -1210,31 +1218,31 @@ export class RecipeScraper {
         src.includes('blank')) {
       return false;
     }
-    
+
     // Filter out advertisement and product images
     const advertisementPatterns = /knife|knives|knife-set|steak-knife|utensil|tool|cookware|equipment|product|advertisement|ad-|promo|affiliate|sponsor|buy|shop|sale|deal|offer|discount|price/i;
     if (advertisementPatterns.test(src) || (alt && advertisementPatterns.test(alt))) {
       console.log(`🚫 Filtered out advertisement image: ${src}`);
       return false;
     }
-    
+
     // Filter out Chef Jean Pierre product promotions specifically
     if (src.includes('Chef-Jean-Pierre') && (src.includes('Knife') || src.includes('Set') || src.includes('Piece'))) {
       console.log(`🚫 Filtered out Chef Jean Pierre product image: ${src}`);
       return false;
     }
-    
+
     // Check for valid image formats
     const imageExtensions = /\.(jpg|jpeg|png|gif|webp|avif)(\?|$)/i;
     const hasImageExtension = imageExtensions.test(src);
-    
+
     // Allow if it has image extension or contains image-like patterns (but not advertisements)
     const imagePatterns = /\.(jpg|jpeg|png|gif|webp|avif)|image|photo|picture|wp-content|recipe|food|dish/i;
-    
+
     // Check alt text for recipe-related content (but not advertisement content)
     const altIsRecipeRelated = alt && /recipe|food|dish|cooking|ingredient|step|instruction/i.test(alt) && 
                               !advertisementPatterns.test(alt);
-    
+
     return hasImageExtension || imagePatterns.test(src) || altIsRecipeRelated;
   }
 
@@ -1261,7 +1269,7 @@ export class RecipeScraper {
     // Check if text looks like an ingredient (contains measurements, common ingredient words)
     const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b)\b/i;
     const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced|white|sharp|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|cream cheese|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed)\b/i;
-    
+
     // Special case for numbered items that look like ingredients (e.g., "4 large russet potatoes")
     const numberedIngredientPattern = /^\d+\s+(large|medium|small|whole|fresh|dried)?\s*(russet|yukon|red|white|sweet)?\s*(potato|potatoes|onion|onions|carrot|carrots|apple|apples|egg|eggs|clove|cloves|cup|cups|tbsp|tsp|oz|lb|pound|pounds)\b/i;
 
@@ -1359,7 +1367,7 @@ export class RecipeScraper {
 
   private static cleanAndDeduplicateIngredients(ingredients: string[]): string[] {
     console.log(`🧹 Starting ingredient cleaning and deduplication for ${ingredients.length} ingredients`);
-    
+
     // Step 1: Basic cleaning and filtering
     const cleanedIngredients = ingredients
       .map(ing => ing.trim())
@@ -1371,7 +1379,7 @@ export class RecipeScraper {
     // Step 2: Exact duplicate removal (case-insensitive)
     const exactDeduped = [];
     const seenExact = new Set<string>();
-    
+
     for (const ingredient of cleanedIngredients) {
       const normalized = ingredient.toLowerCase().trim();
       if (!seenExact.has(normalized)) {
@@ -1390,11 +1398,11 @@ export class RecipeScraper {
 
     for (const ingredient of exactDeduped) {
       const semanticKey = this.generateSemanticKey(ingredient);
-      
+
       if (semanticKeys.has(semanticKey)) {
         const existingIngredient = semanticKeys.get(semanticKey)!;
         console.log(`🔍 Found semantic duplicate: "${ingredient}" vs "${existingIngredient}"`);
-        
+
         // Keep the more detailed/specific version
         if (this.isMoreDetailed(ingredient, existingIngredient)) {
           console.log(`🔄 Replacing "${existingIngredient}" with "${ingredient}"`);
@@ -1479,18 +1487,18 @@ export class RecipeScraper {
 
   private static isMoreDetailed(ingredient1: string, ingredient2: string): boolean {
     // Determine which ingredient is more detailed/specific
-    
+
     // Check for quantities - prefer ingredients with quantities
     const hasQuantity1 = /^\d+/.test(ingredient1) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound|ounce|g|gram|kg|ml|l)/.test(ingredient1);
     const hasQuantity2 = /^\d+/.test(ingredient2) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound|ounce|g|gram|kg|ml|l)/.test(ingredient2);
-    
+
     if (hasQuantity1 && !hasQuantity2) return true;
     if (!hasQuantity1 && hasQuantity2) return false;
 
     // Check for descriptive terms - prefer more descriptive ingredients
     const descriptors1 = (ingredient1.match(/\b(large|medium|small|russet|white|sharp|shredded|grated|crumbled|optional|fresh|dried|ground|chopped|minced|sliced|diced|softened|melted|packed)\b/gi) || []).length;
     const descriptors2 = (ingredient2.match(/\b(large|medium|small|russet|white|sharp|shredded|grated|crumbled|optional|fresh|dried|ground|chopped|minced|sliced|diced|softened|melted|packed)\b/gi) || []).length;
-    
+
     if (descriptors1 > descriptors2) return true;
     if (descriptors1 < descriptors2) return false;
 
@@ -1504,7 +1512,7 @@ export class RecipeScraper {
 
     for (const item of items) {
       const semanticKey = this.generateSemanticKey(item.name);
-      
+
       if (!seenIngredients.has(semanticKey)) {
         seenIngredients.add(semanticKey);
         uniqueItems.push(item);
@@ -1528,7 +1536,7 @@ export class RecipeScraper {
       .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical content
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
-    
+
     // Handle specific ingredient patterns
     if (/potato/i.test(core)) return 'potatoes';
     if (/bacon/i.test(core)) return 'bacon';
@@ -1540,21 +1548,21 @@ export class RecipeScraper {
     if (/butter/i.test(core)) return 'butter';
     if (/salt/i.test(core) && /pepper/i.test(core)) return 'salt and pepper';
     if (/bacon\s*bits/i.test(core)) return 'bacon bits';
-    
+
     // Extract the main ingredient name - prefer the first meaningful word for compound ingredients
     const words = core.split(/\s+/).filter(word => word.length > 2);
     if (words.length > 0) {
       // For compound ingredients, return the first significant word
       return words[0].toLowerCase();
     }
-    
+
     return core.toLowerCase();
   }
 
   private static extractMissingIngredientsFromInstructions(instructionText: string, existingIngredients: string[]): string[] {
     const missingIngredients: string[] = [];
     const lowerInstructionText = instructionText.toLowerCase();
-    
+
     // Common ingredients that might be mentioned in instructions but missing from ingredient list
     const commonIngredients = [
       'cheddar cheese', 'white cheddar cheese', 'shredded cheddar cheese',

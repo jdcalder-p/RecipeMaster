@@ -294,6 +294,10 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
             src={recipe.imageUrl || 'https://images.unsplash.com/photo-1546554137-f86b9593a222?w=800&h=400&fit=crop'}
             alt={recipe.title}
             className="w-full h-64 object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = 'https://images.unsplash.com/photo-1546554137-f86b9593a222?w=800&h=400&fit=crop';
+            }}
           />
         </div>
 
