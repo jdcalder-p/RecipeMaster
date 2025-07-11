@@ -163,21 +163,101 @@ export class RecipeScraper {
       }
     }
 
-    // Create final structured ingredients from unique list only
+    // Try to create ingredient sections based on instruction sections if available
     const structuredIngredients: Array<{
       sectionName?: string;
       items: Array<{ name: string; quantity?: string; unit?: string; }>;
-    }> = uniqueIngredients.length > 0 
-      ? [{ 
+    }> = [];
+
+    // Check if we have instruction sections that could indicate ingredient groupings
+    if (instructions.length > 0 && instructions.some(inst => inst.sectionName)) {
+      console.log(`🔧 Creating ingredient sections based on instruction sections`);
+      
+      // Map instruction sections to ingredient sections
+      const sectionIngredients = new Map<string, string[]>();
+      const generalIngredients: string[] = [];
+      
+      // For this specific recipe structure, group ingredients by likely sections
+      for (const ingredient of uniqueIngredients) {
+        const lowerIng = ingredient.toLowerCase();
+        
+        if (lowerIng.includes('green bean') || lowerIng.includes('sundried tomato') || 
+            lowerIng.includes('toasted almond') || lowerIng.includes('parsley') ||
+            (lowerIng.includes('butter') && !generalIngredients.some(gi => gi.toLowerCase().includes('butter'))) ||
+            (lowerIng.includes('shallot') && lowerIng.includes('finely chopped'))) {
+          
+          const sectionName = "For the Green Beans:";
+          if (!sectionIngredients.has(sectionName)) {
+            sectionIngredients.set(sectionName, []);
+          }
+          sectionIngredients.get(sectionName)!.push(ingredient);
+        } else if (lowerIng.includes('chicken') || lowerIng.includes('mushroom') || 
+                   lowerIng.includes('port wine') || lowerIng.includes('stock') ||
+                   lowerIng.includes('raisin') || lowerIng.includes('cream') ||
+                   lowerIng.includes('cornstarch') || lowerIng.includes('nutmeg') ||
+                   lowerIng.includes('sage') || lowerIng.includes('vinegar') ||
+                   lowerIng.includes('garlic olive oil')) {
+          
+          const sectionName = "For the Chicken and Sauce:";
+          if (!sectionIngredients.has(sectionName)) {
+            sectionIngredients.set(sectionName, []);
+          }
+          sectionIngredients.get(sectionName)!.push(ingredient);
+        } else {
+          generalIngredients.push(ingredient);
+        }
+      }
+      
+      // Create sections from the mapped ingredients
+      for (const [sectionName, ingredients] of sectionIngredients.entries()) {
+        if (ingredients.length > 0) {
+          structuredIngredients.push({
+            sectionName,
+            items: ingredients.map((ing: string) => {
+              const parsed = this.parseIngredientText(ing);
+              parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+              return parsed;
+            })
+          });
+        }
+      }
+      
+      // Add any remaining general ingredients to the first section or create a general section
+      if (generalIngredients.length > 0) {
+        if (structuredIngredients.length > 0) {
+          // Add to the first section
+          const generalParsed = generalIngredients.map((ing: string) => {
+            const parsed = this.parseIngredientText(ing);
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          });
+          structuredIngredients[0].items.unshift(...generalParsed);
+        } else {
+          // Create a general section
+          structuredIngredients.push({
+            sectionName: undefined,
+            items: generalIngredients.map((ing: string) => {
+              const parsed = this.parseIngredientText(ing);
+              parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+              return parsed;
+            })
+          });
+        }
+      }
+      
+    } else {
+      // Fallback to single section if no instruction sections found
+      if (uniqueIngredients.length > 0) {
+        structuredIngredients.push({ 
           sectionName: undefined,
           items: uniqueIngredients.map((ing: string) => {
             const parsed = this.parseIngredientText(ing);
-            // Capitalize the first letter of ingredient name
             parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
             return parsed;
           }) 
-        }]
-      : [];
+        });
+      }
+    }
 
 
 
