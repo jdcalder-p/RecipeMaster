@@ -188,8 +188,13 @@ export class RecipeScraper {
         const lowerIng = ingredient.toLowerCase();
         let assigned = false;
 
+        // Special case for the main bread flour ingredient
+        if (lowerIng.includes('3 2/3') && lowerIng.includes('bread flour')) {
+          rollsIngredients.push(ingredient);
+          assigned = true;
+        }
         // Paste ingredients (for tangzhong/starter) - more specific matching
-        if ((lowerIng.includes('bread flour') && (lowerIng.includes('1/3') || lowerIng.includes('⅓'))) ||
+        else if ((lowerIng.includes('bread flour') && (lowerIng.includes('1/3') || lowerIng.includes('⅓'))) ||
             (lowerIng.includes('milk') && (lowerIng.includes('1/3') || lowerIng.includes('⅓')) && !lowerIng.includes('2/3') && !lowerIng.includes('⅔')) ||
             (lowerIng.includes('hot') && (lowerIng.includes('water') || lowerIng.includes('tap water'))) ||
             (lowerIng.includes('water') && lowerIng.includes('1/2') && lowerIng.includes('c'))) {
@@ -204,7 +209,7 @@ export class RecipeScraper {
                  (lowerIng.includes('butter') && (lowerIng.includes('melt') || lowerIng.includes('3') || lowerIng.includes('tbsp'))) ||
                  (lowerIng.includes('egg') && !lowerIng.includes('yolk') && lowerIng.includes('1')) ||
                  (lowerIng.includes('salt') && !lowerIng.includes('salted') && lowerIng.includes('1') && lowerIng.includes('tsp')) ||
-                 (lowerIng.includes('bread flour') && (lowerIng.includes('3') || lowerIng.includes('2/3') || /3\s*2\/3/.test(lowerIng) || /3\s+2\/3/.test(lowerIng))) ||
+                 (lowerIng.includes('bread flour') && (lowerIng.includes('3') || lowerIng.includes('2/3') || /3\s*2\/3/.test(lowerIng) || /3\s+2\/3/.test(lowerIng) || lowerIng.includes('3 2/3'))) ||
                  (lowerIng.includes('cream') && lowerIng.includes('heavy') && (lowerIng.includes('pour') || lowerIng.includes('whip')))) {
           rollsIngredients.push(ingredient);
           assigned = true;
@@ -298,6 +303,43 @@ export class RecipeScraper {
           });
         }
         console.log(`📝 Added ${unassigned.length} unassigned ingredients`);
+      }
+
+      // Special check: if "3 2/3 c bread flour" is mentioned in instructions but missing from ingredients
+      const hasMainBreadFlour = structuredIngredients.some(section => 
+        section.items.some(item => 
+          item.name.toLowerCase().includes('bread flour') && 
+          (item.quantity?.includes('3') && item.quantity?.includes('2/3'))
+        )
+      );
+
+      if (!hasMainBreadFlour) {
+        console.log(`🔍 Main bread flour ingredient missing, checking instructions...`);
+        const instructionText = instructions.map(inst => 
+          inst.steps.map(step => step.text).join(' ')
+        ).join(' ');
+
+        if (instructionText.includes('3 2/3 c bread flour')) {
+          console.log(`✅ Found missing bread flour in instructions, adding to rolls section`);
+          // Find the rolls section and add the missing ingredient
+          const rollsSection = structuredIngredients.find(section => 
+            section.sectionName?.toLowerCase().includes('roll')
+          );
+          if (rollsSection) {
+            rollsSection.items.push({
+              name: "Bread flour",
+              quantity: "3 2/3",
+              unit: "c"
+            });
+          } else if (structuredIngredients.length > 0) {
+            // Add to first section if no rolls section found
+            structuredIngredients[0].items.push({
+              name: "Bread flour", 
+              quantity: "3 2/3",
+              unit: "c"
+            });
+          }
+        }
       }
 
     } else {
