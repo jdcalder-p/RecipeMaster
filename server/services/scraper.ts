@@ -760,4 +760,28 @@ export class RecipeScraper {
         });
 
         // Filter ingredients to only include ones that look like ingredients (contain common measurements)
-        const measurementPattern = /\b(\d+\/?\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|stri
+        const measurementPattern = /\b(\d+\/?\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\b/i;
+        
+        const filteredIngredients = ingredients.filter((ingredient: string) => {
+          // Skip very short strings
+          if (ingredient.length < 3) return false;
+          
+          // Check if it looks like an ingredient (contains measurement patterns or food keywords)
+          const hasBasicMeasurement = measurementPattern.test(ingredient);
+          const hasCommonIngredients = /\b(flour|sugar|salt|pepper|oil|butter|egg|milk|onion|garlic|chicken|beef|rice|pasta|tomato|cheese|bread|potato|carrot|celery|mushroom|spinach|herbs?|spices?|vanilla|chocolate|lemon|lime|orange|apple|banana|strawberry|blueberry|nuts?|almonds?|walnuts?|coconut|honey|maple|soy|sauce|vinegar|broth|stock|water|wine|beer|cream|yogurt|fish|salmon|tuna|shrimp|beans?|lentils?|chickpeas?|avocado|lettuce|basil|parsley|thyme|rosemary|oregano|paprika|cumin|ginger|cinnamon|nutmeg|cardamom|turmeric|sesame|peanut|cashew|pecan|pine|cranberry|raisin|date|fig|mango|pineapple|kiwi|grape|peach|plum|cherry|apricot|cucumber|zucchini|eggplant|bell|jalapeno|poblano|serrano|habanero|chipotle|cayenne|chili|hot|mild|sweet|sour|bitter|salty|savory|fresh|dried|ground|whole|chopped|diced|sliced|minced|grated|shredded|melted|softened|room|temperature|cold|frozen|canned|jarred|bottled|organic|free|range|grass|fed|wild|caught|extra|virgin|pure|natural|unsweetened|unsalted|low|fat|skim|whole|heavy|light|dark|white|brown|black|red|green|yellow|blue|purple|pink|orange)\b/i;
+          
+          return hasBasicMeasurement || hasCommonIngredients;
+        });
+        
+        console.log(`Found ${filteredIngredients.length} valid ingredients from ${ingredients.length} total`);
+        
+        if (filteredIngredients.length > 0) {
+          return filteredIngredients;
+        }
+      }
+    }
+    
+    console.log(`No ingredients found with any method`);
+    return [];
+  }
+}
