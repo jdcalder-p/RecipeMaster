@@ -399,13 +399,31 @@ export class RecipeScraper {
     }> = [];
 
     if (ingredientsWithSections.length > 0) {
-      finalIngredients = ingredientsWithSections;
+      // If we have sectioned ingredients, use only those and remove duplicates within sections
+      finalIngredients = ingredientsWithSections.map(section => ({
+        ...section,
+        items: this.removeDuplicateIngredientItems(section.items.map((item) => {
+          if (typeof item === 'string') {
+            const parsed = this.parseIngredientText(item);
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          }
+          return {
+            ...item,
+            name: item.name.charAt(0).toUpperCase() + item.name.slice(1)
+          };
+        }))
+      }));
     } else if (cleanedIngredients.length > 0) {
-      finalIngredients = [{ items: cleanedIngredients.map((ing: string) => {
+      const parsedItems = cleanedIngredients.map((ing: string) => {
         const parsed = this.parseIngredientText(ing);
         parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
         return parsed;
-      }) }];
+      });
+      
+      finalIngredients = [{ 
+        items: this.removeDuplicateIngredientItems(parsedItems)
+      }];
     }
 
     return {
@@ -559,6 +577,18 @@ export class RecipeScraper {
     // Clean up the text
     const cleanText = ingredientText.trim().replace(/^\d+\.\s*/, ''); // Remove numbering
 
+    // Handle Unicode fractions first
+    const unicodeFractionRegex = /^([½¼¾⅓⅔⅛⅜⅝⅞⅙⅚]|\d+\s*[½¼¾⅓⅔⅛⅜⅝⅞⅙⅚])\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)\s+(.+)/i;
+    const unicodeFractionMatch = cleanText.match(unicodeFractionRegex);
+
+    if (unicodeFractionMatch) {
+      return {
+        quantity: unicodeFractionMatch[1].trim(),
+        unit: unicodeFractionMatch[2].trim(),
+        name: unicodeFractionMatch[3].trim()
+      };
+    }
+
     // Handle "or" ranges in quantities like "1 or 2 Shallots"
     const orRangeRegex = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?)\s+(?:or|to|-)\s+(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)?\s+(.+)/i;
     const orRangeMatch = cleanText.match(orRangeRegex);
@@ -582,28 +612,39 @@ export class RecipeScraper {
       };
     }
 
-    // Common measurement patterns
-    const measurementRegex = /^(\d+(?:\/\d+)?(?:\.\d+)?)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)\s+(.+)/i;
+    // Handle mixed fractions like "1 1/4 cups"
+    const mixedFractionRegex = /^(\d+\s+\d+\/\d+)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)\s+(.+)/i;
+    const mixedFractionMatch = cleanText.match(mixedFractionRegex);
 
-    const match = cleanText.match(measurementRegex);
-
-    if (match) {
+    if (mixedFractionMatch) {
       return {
-        quantity: match[1],
-        unit: match[2],
-        name: match[3].trim()
+        quantity: mixedFractionMatch[1].trim(),
+        unit: mixedFractionMatch[2].trim(),
+        name: mixedFractionMatch[3].trim()
       };
     }
 
-    // Try to extract fractional quantities like "1/2 cup flour"
-    const fractionRegex = /^(\d+\/\d+|\d+\s+\d+\/\d+)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?)\s+(.+)/i;
+    // Handle simple fractions like "1/2 cup"
+    const fractionRegex = /^(\d+\/\d+)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)\s+(.+)/i;
     const fractionMatch = cleanText.match(fractionRegex);
 
     if (fractionMatch) {
       return {
-        quantity: fractionMatch[1],
-        unit: fractionMatch[2],
+        quantity: fractionMatch[1].trim(),
+        unit: fractionMatch[2].trim(),
         name: fractionMatch[3].trim()
+      };
+    }
+
+    // Common measurement patterns with numbers
+    const measurementRegex = /^(\d+(?:\.\d+)?)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)\s+(.+)/i;
+    const measurementMatch = cleanText.match(measurementRegex);
+
+    if (measurementMatch) {
+      return {
+        quantity: measurementMatch[1].trim(),
+        unit: measurementMatch[2].trim(),
+        name: measurementMatch[3].trim()
       };
     }
 
@@ -613,7 +654,7 @@ export class RecipeScraper {
 
     if (simpleMatch) {
       return {
-        quantity: simpleMatch[1],
+        quantity: simpleMatch[1].trim(),
         name: simpleMatch[2].trim()
       };
     }
@@ -1455,6 +1496,25 @@ export class RecipeScraper {
 
     // If all else is equal, prefer the longer ingredient name (likely more specific)
     return ingredient1.length > ingredient2.length;
+  }
+
+  private static removeDuplicateIngredientItems(items: Array<{ name: string; quantity?: string; unit?: string; }>): Array<{ name: string; quantity?: string; unit?: string; }> {
+    const uniqueItems = [];
+    const seenIngredients = new Set<string>();
+
+    for (const item of items) {
+      const semanticKey = this.generateSemanticKey(item.name);
+      
+      if (!seenIngredients.has(semanticKey)) {
+        seenIngredients.add(semanticKey);
+        uniqueItems.push(item);
+        console.log(`✅ Added unique ingredient item: "${item.name}"`);
+      } else {
+        console.log(`🔍 Removed duplicate ingredient item: "${item.name}"`);
+      }
+    }
+
+    return uniqueItems;
   }
 
   private static extractCoreIngredientName(ingredient: string): string {
