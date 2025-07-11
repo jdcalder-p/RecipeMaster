@@ -259,7 +259,15 @@ export class RecipeScraper {
       servings,
       ingredients: structuredIngredients,
       instructions: finalInstructions,
-      imageUrl: this.parseImage(recipe.image),
+      imageUrl: this.parseImage(recipe.image) || this.extractImageBySelectors($, [
+        '.recipe-image img',
+        '.recipe-photo img',
+        '[class*="recipe"] img',
+        '.entry-content img:first-of-type',
+        '.wp-block-image img',
+        '.featured-image img',
+        'article img'
+      ], url),
       category: this.parseCategory(recipe.recipeCategory),
       videoUrl: recipe.video?.contentUrl || recipe.video?.embedUrl || '',
     };
@@ -687,7 +695,7 @@ export class RecipeScraper {
         if (images.length > index) {
           const img = images.eq(index);
           const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
-          if (src) {
+          if (src && !src.includes('data:image/svg+xml') && !src.includes('placeholder')) {
             imageUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
             console.log(`Found image for step ${stepNumber}: ${imageUrl}`);
             break;
@@ -701,7 +709,7 @@ export class RecipeScraper {
         if (allImages.length > index) {
           const img = allImages.eq(index);
           const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
-          if (src) {
+          if (src && !src.includes('data:image/svg+xml') && !src.includes('placeholder')) {
             imageUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
             console.log(`Found fallback image for step ${stepNumber}: ${imageUrl}`);
           }
@@ -923,14 +931,22 @@ export class RecipeScraper {
   }
 
   private static parseImage(image: any): string {
-    if (typeof image === 'string') return image;
-    if (Array.isArray(image) && image.length > 0) {
-      return typeof image[0] === 'string' ? image[0] : image[0].url || '';
+    let imageUrl = '';
+    
+    if (typeof image === 'string') {
+      imageUrl = image;
+    } else if (Array.isArray(image) && image.length > 0) {
+      imageUrl = typeof image[0] === 'string' ? image[0] : image[0].url || '';
+    } else if (image && typeof image === 'object') {
+      imageUrl = image.url || image.contentUrl || '';
     }
-    if (image && typeof image === 'object') {
-      return image.url || image.contentUrl || '';
+    
+    // Filter out placeholder SVG images
+    if (imageUrl && (imageUrl.includes('data:image/svg+xml') || imageUrl.includes('placeholder'))) {
+      return '';
     }
-    return '';
+    
+    return imageUrl;
   }
 
   private static parseCategory(category: any): string {
@@ -1056,12 +1072,30 @@ export class RecipeScraper {
     for (const selector of selectors) {
       const img = $(selector).first();
       if (img.length) {
-        const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
-        if (src) {
+        const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || img.attr('data-original');
+        if (src && !src.includes('data:image/svg+xml') && !src.includes('placeholder')) {
           return src.startsWith('http') ? src : new URL(src, baseUrl).href;
         }
       }
     }
+    
+    // If no image found with selectors, try to find any large image on the page
+    const allImages = $('img');
+    for (let i = 0; i < allImages.length; i++) {
+      const img = allImages.eq(i);
+      const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || img.attr('data-original');
+      const alt = img.attr('alt') || '';
+      
+      if (src && 
+          !src.includes('data:image/svg+xml') && 
+          !src.includes('placeholder') &&
+          !src.includes('logo') &&
+          !src.includes('icon') &&
+          (src.includes('recipe') || src.includes('food') || alt.toLowerCase().includes('recipe') || alt.toLowerCase().includes('food'))) {
+        return src.startsWith('http') ? src : new URL(src, baseUrl).href;
+      }
+    }
+    
     return '';
   }
 
