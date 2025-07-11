@@ -28,38 +28,38 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   }, [open]);
 
   // Helper function to parse ingredient text into components
-  const parseIngredientText = (text: string): { name: string; quantity?: string; unit?: string } => {
-    const cleanText = text.trim();
+  const parseIngredientText = (text: string): { quantity?: string; unit?: string; name: string } => {
+    if (!text) return { name: "" };
 
-    // Common units pattern
-    const unitPattern = /\b(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\b/i;
+    let remaining = text.trim();
+    let quantity = "";
+    let unit = "";
 
-    // Try to match: quantity + unit + ingredient
-    const fullPattern = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?(?:\s*\d+(?:\s*\/\s*\d+)?)*|\d*[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\s+(.+)/i;
+    // First, try to extract quantity (including fractions and mixed numbers)
+    const quantityPattern = /^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?|\d+\/\d+|[½¼¾⅓⅔⅛⅜⅝⅞⅙⅚]|\d+\s*[½¼¾⅓⅔⅛⅜⅝⅞⅙⅚])\s*/;
+    const quantityMatch = remaining.match(quantityPattern);
 
-    // Try to match: quantity + ingredient (no unit)
-    const quantityPattern = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?(?:\s*\d+(?:\s*\/\s*\d+)?)*|\d*[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])\s+(.+)/;
-
-    const fullMatch = cleanText.match(fullPattern);
-    if (fullMatch) {
-      return {
-        quantity: fullMatch[1].trim(),
-        unit: fullMatch[2].trim(),
-        name: fullMatch[3].trim()
-      };
-    }
-
-    const quantityMatch = cleanText.match(quantityPattern);
     if (quantityMatch) {
-      return {
-        quantity: quantityMatch[1].trim(),
-        name: quantityMatch[2].trim()
-      };
+      quantity = quantityMatch[1].trim();
+      remaining = remaining.substring(quantityMatch[0].length);
     }
 
-    // No quantity found, return as is
+    // Then extract unit
+    const unitPattern = /^(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|pound|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\s*/i;
+    const unitMatch = remaining.match(unitPattern);
+
+    if (unitMatch) {
+      unit = unitMatch[1];
+      remaining = remaining.substring(unitMatch[0].length);
+    }
+
+    // Clean up remaining text (ingredient name)
+    remaining = remaining.replace(/^of\s+/i, "").trim();
+
     return {
-      name: cleanText
+      quantity: quantity || undefined,
+      unit: unit || undefined,
+      name: remaining || text
     };
   };
 
@@ -99,7 +99,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
     // Find the closest fraction match
     let closestFraction = '';
     let smallestDiff = Infinity;
-    
+
     for (const [decimal, fraction] of Object.entries(fractionMap)) {
       const diff = Math.abs(decimalPart - parseFloat(decimal));
       if (diff < 0.01 && diff < smallestDiff) {
@@ -163,7 +163,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
           return unicodeFractions[part];
         }
         if (/\d+[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚]/.test(part)) {
-          const match = part.match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])$/);
+          const match = part.match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞⅙])$/);
           if (match) {
             return parseInt(match[1]) + unicodeFractions[match[2]];
           }
