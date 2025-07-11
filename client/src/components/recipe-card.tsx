@@ -152,6 +152,10 @@ export function RecipeCard({ recipe, onViewRecipe }: RecipeCardProps) {
           src={recipe.imageUrl || 'https://images.unsplash.com/photo-1546554137-f86b9593a222?w=400&h=250&fit=crop'}
           alt={recipe.title}
           className="w-full h-48 object-cover rounded-t-lg"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = 'https://images.unsplash.com/photo-1546554137-f86b9593a222?w=400&h=250&fit=crop';
+          }}
         />
         {recipe.videoUrl && (
           <div className="absolute inset-0 flex items-center justify-center">
