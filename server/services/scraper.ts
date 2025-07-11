@@ -349,355 +349,13 @@ export class RecipeScraper {
     console.log(`=== INSTRUCTION EXTRACTION DEBUG ===`);
     console.log(`Found ${instructions.length} instructions using selectors:`, instructions.slice(0, 5));
 
-    // If we didn't find many instructions, try broader searches
+    // If we still don't have enough instructions, use the advanced extraction
     if (instructions.length < 3) {
-      console.log("Low instruction count, trying broader search...");
+      console.log("Standard extraction found insufficient instructions, using advanced method...");
+      const advancedInstructions = this.extractInstructionsAdvanced($);
 
-      // Try to find instruction content in paragraphs or divs
-      const paragraphInstructions = $('p, div').filter((_, el) => {
-        const text = $(el).text().trim();
-        // Look for numbered steps or instruction patterns
-        return /^\d+\./.test(text) || 
-               /^step \d+/i.test(text) ||
-               (text.length > 20 && text.length < 500 && 
-                (text.toLowerCase().includes('cook') || 
-                 text.toLowerCase().includes('bake') || 
-                 text.toLowerCase().includes('heat') ||
-                 text.toLowerCase().includes('add') ||
-                 text.toLowerCase().includes('stir') ||
-                 text.toLowerCase().includes('season') ||
-                 text.toLowerCase().includes('place') ||
-                 text.toLowerCase().includes('remove') ||
-                 text.toLowerCase().includes('combine') ||
-                 text.toLowerCase().includes('mix') ||
-                 text.toLowerCase().includes('sauté') ||
-                 text.toLowerCase().includes('simmer') ||
-                 text.toLowerCase().includes('serve')));
-      }).map((_, el) => $(el).text().trim()).get();
-
-      console.log(`Found ${paragraphInstructions.length} paragraph instructions:`, paragraphInstructions.slice(0, 3));
-
-      if (paragraphInstructions.length > instructions.length) {
-        instructions = paragraphInstructions;
-      }
-
-      // If still no good instructions, try to extract from any numbered content
-      if (instructions.length < 3) {
-        console.log("Still low count, trying numbered content extraction...");
-        
-        // Look for any element that contains numbered steps
-        const numberedContent = $('*').filter((_, el) => {
-          const text = $(el).text().trim();
-          // Must start with a number and period, and be a reasonable length
-          return /^\d+\.\s*\w/.test(text) && 
-                 text.length > 15 && 
-                 text.length < 1000 &&
-                 !text.toLowerCase().includes('advertisement') &&
-                 !text.toLowerCase().includes('subscribe');
-        }).map((_, el) => $(el).text().trim()).get();
-
-        console.log(`Found ${numberedContent.length} numbered content items:`, numberedContent.slice(0, 3));
-
-        if (numberedContent.length > instructions.length) {
-          instructions = numberedContent;
-        }
-      }
-
-      // Last resort: try to find any text that looks like cooking instructions
-      if (instructions.length < 2) {
-        console.log("Last resort: looking for cooking-related text blocks...");
-        
-        // First, try to find content with section headers like "make the sauce"
-        const sectionBasedInstructions: string[] = [];
-        
-        // Look for headings that might indicate instruction sections
-        $('h1, h2, h3, h4, h5, h6, strong, b, .heading, .title, .section-title').each((_, el) => {
-          const $heading = $(el);
-          const headingText = $heading.text().trim().toLowerCase();
-          
-          // Check if this looks like an instruction section
-          if (headingText.includes('sauce') || 
-              headingText.includes('preparation') || 
-              headingText.includes('instructions') || 
-              headingText.includes('method') || 
-              headingText.includes('directions') || 
-              headingText.includes('steps') ||
-              headingText.includes('make') ||
-              headingText.includes('prepare') ||
-              headingText.includes('cook') ||
-              /step \d+/i.test(headingText)) {
-            
-            console.log(`Found potential instruction section: "${headingText}"`);
-            
-            // Add the section header
-            sectionBasedInstructions.push($heading.text().trim());
-            
-            // Look for content following this heading
-            let $next = $heading.next();
-            let attempts = 0;
-            
-            while ($next.length && attempts < 10) {
-              attempts++;
-              const nextText = $next.text().trim();
-              
-              // Stop if we hit another heading
-              if ($next.is('h1, h2, h3, h4, h5, h6, .heading, .title, .section-title') && 
-                  nextText.length > 0) {
-                break;
-              }
-              
-              // If this element contains cooking instructions
-              if (nextText.length > 20 && nextText.length < 1000) {
-                const cookingWords = [
-                  'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
-                  'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
-                  'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
-                  'until', 'minutes', 'degrees', 'temperature'
-                ];
-                
-                const hasCookingWords = cookingWords.some(word => 
-                  nextText.toLowerCase().includes(word)
-                );
-                
-                if (hasCookingWords && 
-                    !nextText.toLowerCase().includes('advertisement') &&
-                    !nextText.toLowerCase().includes('subscribe')) {
-                  sectionBasedInstructions.push(nextText);
-                }
-              }
-              
-              // If this is a list, extract all list items
-              if ($next.is('ul, ol')) {
-                $next.find('li').each((_, li) => {
-                  const liText = $(li).text().trim();
-                  if (liText.length > 15 && liText.length < 800) {
-                    sectionBasedInstructions.push(liText);
-                  }
-                });
-              }
-              
-              $next = $next.next();
-            }
-          }
-        });
-        
-        console.log(`Found ${sectionBasedInstructions.length} section-based instructions:`, sectionBasedInstructions.slice(0, 5));
-        
-        if (sectionBasedInstructions.length > instructions.length) {
-          instructions = sectionBasedInstructions;
-        }
-        
-        // If still no good content, try the broader search
-        if (instructions.length < 2) {
-          // First try to find content specifically for Chef Jean Pierre's website
-          if (url && url.includes('chefjeanpierre.com')) {
-            console.log("Detected Chef Jean Pierre website, using specialized extraction...");
-            
-            // Look for content in specific Chef Jean Pierre page structure
-            const chefJPContent: string[] = [];
-            
-            // Enhanced extraction for Chef Jean Pierre - look for instruction blocks after section headings
-            $('.entry-content, .post-content, .content, .recipe-content, main, article, .elementor-text-editor, .elementor-widget-text-editor').each((_, container) => {
-              console.log(`Checking container: ${$(container).attr('class') || 'no-class'}`);
-              
-              // Find section headings that might precede instructions
-              $(container).find('h1, h2, h3, h4, h5, h6, p, div, strong, b').each((_, el) => {
-                const $el = $(el);
-                const headingText = $el.text().trim();
-                
-                // Check if this looks like a section heading for instructions
-                if (/makes?\s+\d+.*serving|instructions?|method|directions?|steps?|preparation/i.test(headingText)) {
-                  console.log(`Found instruction section heading: "${headingText}"`);
-                  
-                  // Look for instruction content following this heading
-                  let $current = $el.next();
-                  let attempts = 0;
-                  let foundInstructionBlock = false;
-                  
-                  while ($current.length && attempts < 20) {
-                    attempts++;
-                    
-                    const currentText = $current.text().trim();
-                    console.log(`Checking element after heading: "${currentText.substring(0, 100)}..."`);
-                    
-                    // Stop if we hit another major heading
-                    if ($current.is('h1, h2, h3, h4, h5, h6') && 
-                        currentText.length > 0 && 
-                        attempts > 1) {
-                      console.log(`Hit another heading, stopping search: "${currentText}"`);
-                      break;
-                    }
-                    
-                    // Check if this element contains instruction text
-                    if (currentText.length > 30 && currentText.length < 2000) {
-                      // Look for specific instruction patterns
-                      const hasInstructionWords = [
-                        'in a glass bowl', 'add the salt', 'mix well', 'wait at least',
-                        'after about', 'minutes', 'add all the ingredients', 
-                        'on a medium heat', 'in a frying pan', 'preferably non-stick',
-                        'when hot', 'degrees', 'using a wooden spoon', 'spatula',
-                        'mix the eggs', 'constantly', 'create small curds', 'cook only'
-                      ].some(phrase => currentText.toLowerCase().includes(phrase));
-                      
-                      const hasCookingActions = [
-                        'heat', 'cook', 'bake', 'add', 'mix', 'stir', 'combine', 'season',
-                        'serve', 'place', 'remove', 'dissolve', 'fry', 'melt', 'pour',
-                        'wait', 'using', 'create', 'constantly'
-                      ].some(word => currentText.toLowerCase().includes(word));
-                      
-                      const hasTimeOrTemp = /\b(\d+\s*minutes?|\d+\s*degrees?|\d+f\b|medium\s+heat|couple\s+minutes)\b/i.test(currentText);
-                      
-                      if (hasInstructionWords || (hasCookingActions && hasTimeOrTemp)) {
-                        console.log(`Found instruction content: "${currentText.substring(0, 150)}..."`);
-                        foundInstructionBlock = true;
-                        
-                        // If this is a long block of text, try to split it into sentences
-                        if (currentText.length > 200 && currentText.includes('.')) {
-                          const sentences = currentText.split(/\.\s+/)
-                            .map(s => s.trim())
-                            .filter(s => s.length > 15)
-                            .map(s => s.endsWith('.') ? s : s + '.');
-                          
-                          console.log(`Split long instruction into ${sentences.length} sentences`);
-                          chefJPContent.push(...sentences);
-                        } else {
-                          chefJPContent.push(currentText);
-                        }
-                      }
-                    }
-                    
-                    // Also check child elements for instruction text
-                    $current.find('p, div, span, li').each((_, child) => {
-                      const childText = $(child).text().trim();
-                      if (childText.length > 30 && childText.length < 1000) {
-                        const hasInstructionContent = [
-                          'glass bowl', 'salt', 'eggs', 'mix', 'minutes', 'ingredients',
-                          'frying pan', 'butter', 'heat', 'wooden spoon', 'spatula',
-                          'constantly', 'curds', 'cook'
-                        ].some(word => childText.toLowerCase().includes(word));
-                        
-                        if (hasInstructionContent) {
-                          console.log(`Found instruction in child element: "${childText.substring(0, 100)}..."`);
-                          chefJPContent.push(childText);
-                        }
-                      }
-                    });
-                    
-                    $current = $current.next();
-                  }
-                  
-                  // If we found instruction content, we can stop looking
-                  if (foundInstructionBlock && chefJPContent.length > 0) {
-                    console.log(`Found ${chefJPContent.length} instruction blocks after heading "${headingText}"`);
-                    return false; // Break out of the each loop
-                  }
-                }
-              });
-              
-              // If we still haven't found good instructions, do a broader search in this container
-              if (chefJPContent.length === 0) {
-                console.log("No instructions found with section-based search, trying broader search...");
-                
-                // Look for any text that might be instructions
-                $(container).find('*').each((_, el) => {
-                  const $el = $(el);
-                  const text = $el.text().trim();
-                  
-                  // Skip if this element has significant child elements (likely a container)
-                  const childElements = $el.children().not('span, strong, b, em, i, a');
-                  if (childElements.length > 1) return;
-                  
-                  // Look for text that mentions the specific instruction content we know is there
-                  if (text.length > 50 && text.length < 2000) {
-                    const hasSpecificContent = [
-                      'glass bowl', 'salt in the eggs', 'wait at least 15 minutes',
-                      'after about 15 minutes', 'frying pan', 'preferably non-stick',
-                      'medium heat', 'wooden spoon', 'silicone spatula', 'mix the eggs constantly',
-                      'create small curds', 'cook only a couple minutes'
-                    ].some(phrase => text.toLowerCase().includes(phrase));
-                    
-                    if (hasSpecificContent) {
-                      console.log(`Found specific instruction content: "${text.substring(0, 150)}..."`);
-                      
-                      // Split long text into logical instruction steps
-                      if (text.length > 200) {
-                        const steps = text.split(/\.\s+/)
-                          .map(s => s.trim())
-                          .filter(s => s.length > 20)
-                          .map(s => s.endsWith('.') ? s : s + '.');
-                        
-                        chefJPContent.push(...steps);
-                      } else {
-                        chefJPContent.push(text);
-                      }
-                    }
-                  }
-                });
-              }
-            });
-            
-            // Remove duplicates and filter out low-quality content
-            const uniqueChefJPContent = Array.from(new Set(chefJPContent))
-              .filter(text => {
-                // Final quality check - be more permissive for Chef Jean Pierre
-                return text.length > 20 && 
-                       text.length < 2000 &&
-                       !text.match(/^(ingredients?|instruction|method|directions?|recipe|about|share|follow):?$/i) &&
-                       !text.toLowerCase().includes('advertisement') &&
-                       !text.toLowerCase().includes('subscribe') &&
-                       // Allow "makes 1" if it's part of a longer instruction
-                       !(text.toLowerCase().includes('makes 1') && text.length < 50);
-              })
-              .slice(0, 20); // Increase limit for Chef Jean Pierre
-            
-            console.log(`Found ${uniqueChefJPContent.length} Chef Jean Pierre specific content blocks:`, uniqueChefJPContent.slice(0, 5));
-            
-            if (uniqueChefJPContent.length > instructions.length) {
-              instructions = uniqueChefJPContent;
-            }
-          }
-          
-          // If still no good content, try the general broader search
-          if (instructions.length < 2) {
-            const cookingContent = $('p, div, span, li').filter((_, el) => {
-              const text = $(el).text().trim();
-              const cookingWords = [
-                'heat', 'cook', 'bake', 'sauté', 'fry', 'boil', 'simmer', 'roast',
-                'add', 'mix', 'stir', 'combine', 'season', 'serve', 'place', 'remove',
-                'slice', 'chop', 'dice', 'mince', 'whisk', 'blend', 'pour', 'spread',
-                'sauce', 'make', 'prepare', 'until', 'minutes', 'degrees'
-              ];
-              
-              const hasCookingWords = cookingWords.some(word => 
-                text.toLowerCase().includes(word)
-              );
-              
-              return hasCookingWords && 
-                     text.length > 30 && 
-                     text.length < 1000 &&
-                     !text.toLowerCase().includes('advertisement') &&
-                     !text.toLowerCase().includes('subscribe') &&
-                     !text.toLowerCase().includes('nutrition') &&
-                     !text.toLowerCase().includes('calories');
-            }).map((_, el) => $(el).text().trim()).get();
-
-            // Remove duplicates and sort by relevance
-            const uniqueCookingContent = Array.from(new Set(cookingContent))
-              .filter(text => 
-                // Filter out common non-instruction content
-                text.length > 30 &&
-                !(text.toLowerCase().includes('recipe') && text.length < 100) &&
-                !(text.toLowerCase().includes('about') && text.length < 100)
-              )
-              .slice(0, 15); // Increase limit
-
-            console.log(`Found ${uniqueCookingContent.length} cooking content blocks:`, uniqueCookingContent.slice(0, 5));
-
-            if (uniqueCookingContent.length > instructions.length) {
-              instructions = uniqueCookingContent;
-            }
-          }
-        }
+      if (advancedInstructions.length > instructions.length) {
+        instructions = advancedInstructions;
       }
     }
     const cookTime = this.extractBySelectors($, selectors.cookTime);
@@ -743,6 +401,52 @@ export class RecipeScraper {
       imageUrl,
       videoUrl,
     };
+  }
+
+  private static extractInstructionsAdvanced($: cheerio.CheerioAPI): string[] {
+    console.log("Starting advanced instruction extraction...");
+    const instructions: string[] = [];
+  
+    // 1. Look for numbered steps in paragraphs and divs
+    $('p, div').each((_, el) => {
+      const text = $(el).text().trim();
+      if (/^\d+\.\s/.test(text) && text.length > 20 && text.length < 1000) {
+        instructions.push(text);
+      }
+    });
+  
+    // 2. Look for instruction sections based on headings
+    $('h1, h2, h3, h4, h5, h6, strong, b').each((_, el) => {
+      const $heading = $(el);
+      const headingText = $heading.text().trim().toLowerCase();
+  
+      if (/(instructions?|method|directions?|steps?)/.test(headingText)) {
+        let $next = $heading.next();
+        let attempts = 0;
+  
+        while ($next.length && attempts < 5) {
+          attempts++;
+          const nextText = $next.text().trim();
+  
+          if (nextText.length > 20 && nextText.length < 1000) {
+            instructions.push(nextText);
+          }
+  
+          $next = $next.next();
+        }
+      }
+    });
+  
+    // 3. Look for content in lists
+    $('ol li, ul li').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.length > 20 && text.length < 1000) {
+        instructions.push(text);
+      }
+    });
+  
+    console.log(`Found ${instructions.length} instructions via advanced extraction`);
+    return instructions;
   }
 
   private static extractInstructionsWithImages($: cheerio.CheerioAPI, instructions: string[], baseUrl: string): Array<{ text: string; imageUrl?: string }> {
@@ -995,7 +699,7 @@ export class RecipeScraper {
 
     // If no good instructions found, try a broader search for paragraphs with cooking content
     console.log(`No instructions found with selectors, trying broader paragraph search...`);
-    
+
     const paragraphs = $('p, div').filter((_, el) => {
       const text = $(el).text().trim();
       // Look for cooking-related content that's substantial
@@ -1056,335 +760,28 @@ export class RecipeScraper {
         });
 
         // Filter ingredients to only include ones that look like ingredients (contain common measurements)
-        const measurementPattern = /\b(\d+\/?\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?)\b/i;
-
-        const filteredIngredients = ingredients.filter(ing => {
-          const text = ing.toLowerCase();
-          // Keep if it contains measurements or common ingredient words
-          return measurementPattern.test(ing) || 
-                 text.includes('salt') || text.includes('pepper') || text.includes('flour') || 
-                 text.includes('sugar') || text.includes('butter') || text.includes('egg') ||
-                 text.includes('milk') || text.includes('water') || text.includes('oil') ||
-                 text.includes('yeast') || text.includes('vanilla') || text.includes('cinnamon');
+        const measurementPattern = /\b(\d+\/?\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\b/i;
+        
+        const filteredIngredients = ingredients.filter((ingredient: string) => {
+          // Skip very short strings
+          if (ingredient.length < 3) return false;
+          
+          // Check if it looks like an ingredient (contains measurement patterns or food keywords)
+          const hasBasicMeasurement = measurementPattern.test(ingredient);
+          const hasCommonIngredients = /\b(flour|sugar|salt|pepper|oil|butter|egg|milk|onion|garlic|chicken|beef|rice|pasta|tomato|cheese|bread|potato|carrot|celery|mushroom|spinach|herbs?|spices?|vanilla|chocolate|lemon|lime|orange|apple|banana|strawberry|blueberry|nuts?|almonds?|walnuts?|coconut|honey|maple|soy|sauce|vinegar|broth|stock|water|wine|beer|cream|yogurt|fish|salmon|tuna|shrimp|beans?|lentils?|chickpeas?|avocado|lettuce|basil|parsley|thyme|rosemary|oregano|paprika|cumin|ginger|cinnamon|nutmeg|cardamom|turmeric|sesame|peanut|cashew|pecan|pine|cranberry|raisin|date|fig|mango|pineapple|kiwi|grape|peach|plum|cherry|apricot|cucumber|zucchini|eggplant|bell|jalapeno|poblano|serrano|habanero|chipotle|cayenne|chili|hot|mild|sweet|sour|bitter|salty|savory|fresh|dried|ground|whole|chopped|diced|sliced|minced|grated|shredded|melted|softened|room|temperature|cold|frozen|canned|jarred|bottled|organic|free|range|grass|fed|wild|caught|extra|virgin|pure|natural|unsweetened|unsalted|low|fat|skim|whole|heavy|light|dark|white|brown|black|red|green|yellow|blue|purple|pink|orange)\b/i;
+          
+          return hasBasicMeasurement || hasCommonIngredients;
         });
-
+        
+        console.log(`Found ${filteredIngredients.length} valid ingredients from ${ingredients.length} total`);
+        
         if (filteredIngredients.length > 0) {
           return filteredIngredients;
         }
-
-        // If filtered list is empty, return all ingredients (some recipes might not have standard measurements)
-        return ingredients.filter(Boolean);
       }
     }
-
-    // Last resort: try to extract from the entire page content
-    const allText = $('body').text();
-    const lines = allText.split('\n').map(line => line.trim()).filter(Boolean);
-
-    const ingredientLines = lines.filter(line => {
-      const text = line.toLowerCase();
-      // Look for lines that seem like ingredients
-      return /\b(\d+\/?\d*)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?)\b/i.test(line) ||
-             (text.includes('cup') && text.length < 100) ||
-             (text.includes('tbsp') && text.length < 100) ||
-             (text.includes('tsp') && text.length < 100);
-    });
-
-    return ingredientLines.slice(0, 20); // Limit to reasonable number
-  }
-
-  private static extractVideoUrl($: cheerio.CheerioAPI): string {
-    // Look for YouTube, Vimeo, or other video embeds
-    const videoSelectors = [
-      'iframe[src*="youtube.com"]',
-      'iframe[src*="youtu.be"]', 
-      'iframe[src*="vimeo.com"]',
-      'iframe[src*="dailymotion.com"]',
-      'video source',
-      '.video-container iframe',
-      '.recipe-video iframe',
-      '[data-video-url]',
-      'a[href*="youtube.com"]',
-      'a[href*="youtu.be"]',
-      'a[href*="vimeo.com"]',
-    ];
-
-    for (const selector of videoSelectors) {
-      const element = $(selector).first();
-      if (element.length) {
-        // For iframes, get src attribute
-        const src = element.attr('src');
-        if (src && (src.includes('youtube') || src.includes('vimeo') || src.includes('dailymotion'))) {
-          return src.startsWith('//') ? `https:${src}` : src;
-        }
-
-        // For links, get href attribute
-        const href = element.attr('href');
-        if (href && (href.includes('youtube') || href.includes('youtu.be') || href.includes('vimeo'))) {
-          return href;
-        }
-
-        // For data attributes
-        const dataUrl = element.attr('data-video-url');
-        if (dataUrl) return dataUrl;
-      }
-    }
-
-    return '';
-  }
-
-  private static extractImageBySelectors($: cheerio.CheerioAPI, selectors: string[], baseUrl: string): string {
-    for (const selector of selectors) {
-      const element = $(selector).first();
-      if (element.length) {
-        const src = element.attr('src') || element.attr('data-src');
-        if (src) {
-          return src.startsWith('http') ? src : new URL(src, baseUrl).href;
-        }
-      }
-    }
-    return '';
-  }
-
-  private static parseInstructions(instructions: any[]): string[] {
-    const parsedInstructions = instructions.map(inst => {
-      if (typeof inst === 'string') return inst.trim();
-      if (inst.text) return inst.text.trim();
-      if (inst.name) return inst.name.trim();
-      return '';
-    }).filter(Boolean);
-
-    // Remove duplicates by converting to Set and back to array
-    const uniqueInstructions = Array.from(new Set(parsedInstructions));
-
-    return uniqueInstructions;
-  }
-
-  private static parseDuration(duration: string): string {
-    if (!duration) return '';
-
-    // Parse ISO 8601 duration (PT30M) or simple text
-    const isoMatch = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-    if (isoMatch) {
-      const hours = parseInt(isoMatch[1] || '0');
-      const minutes = parseInt(isoMatch[2] || '0');
-      if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-      }
-      return `${minutes} min`;
-    }
-
-    return duration;
-  }
-
-  private static parseServings(yield_: any): number {
-    if (typeof yield_ === 'number') return yield_;
-    if (typeof yield_ === 'string') {
-      const match = yield_.match(/\d+/);
-      return match ? parseInt(match[0]) : 1;
-    }
-    return 1;
-  }
-
-  private static extractServingsFromText(text: string): number | null {
-    if (!text) return null;
-
-    // Look for serving patterns in text
-    const servingPatterns = [
-      /makes?\s+(\d+)\s+servings?/i,
-      /serves?\s+(\d+)/i,
-      /(\d+)\s+servings?/i,
-      /yields?\s+(\d+)/i,
-      /portions?\s*:?\s*(\d+)/i,
-      /recipe\s+makes?\s+(\d+)/i,
-    ];
-
-    for (const pattern of servingPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        const servings = parseInt(match[1]);
-        if (servings > 0 && servings <= 100) { // Reasonable range
-          console.log(`Found servings in text: ${servings} from "${text}"`);
-          return servings;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  private static decodeHtmlEntities(text: string): string {
-    const htmlEntities: { [key: string]: string } = {
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#39;': "'",
-      '&apos;': "'",
-      '&nbsp;': ' '
-    };
-
-    return text.replace(/&[#\w]+;/g, (entity) => {
-      return htmlEntities[entity] || entity;
-    });
-  }
-
-  private static parseImage(image: any): string {
-    if (typeof image === 'string') return image;
-    if (Array.isArray(image) && image.length > 0) {
-      return typeof image[0] === 'string' ? image[0] : image[0].url || '';
-    }
-    if (image && image.url) return image.url;
-    return '';
-  }
-
-  private static parseCategory(category: any): string {
-    if (typeof category === 'string') return category;
-    if (Array.isArray(category) && category.length > 0) {
-      return category[0];
-    }
-    return '';
-  }
-
-  private static standardizeUnit(unit: string): string {
-    const unitLower = unit.toLowerCase();
-
-    // Standardize units according to user requirements
-    const unitMap: { [key: string]: string } = {
-      // Cup variations
-      'c': 'Cup',
-      'cup': 'Cup',
-      'cups': 'Cup',
-
-      // Tablespoon variations  
-      'tbsp': 'Tbsp',
-      'tbs': 'Tbsp',
-      'tablespoon': 'Tbsp',
-      'tablespoons': 'Tbsp',
-      't': 'Tbsp', // common abbreviation
-
-      // Teaspoon variations
-      'tsp': 'tsp',
-      'teaspoon': 'tsp', 
-      'teaspoons': 'tsp',
-
-      // Ounce variations
-      'oz': 'oz',
-      'ozs': 'oz',
-      'ounce': 'oz',
-      'ounces': 'oz',
-
-      // Pound variations
-      'lb': 'lb',
-      'lbs': 'lb',
-      'pound': 'lb',
-      'pounds': 'lb',
-
-      // Gram variations
-      'g': 'g',
-      'gram': 'g',
-      'grams': 'g',
-
-      // Other units (keep as-is but standardize casing)
-      'kg': 'kg',
-      'kilogram': 'kg',
-      'kilograms': 'kg',
-      'ml': 'ml',
-      'milliliter': 'ml',
-      'milliliters': 'ml',
-      'l': 'L',
-      'liter': 'L',
-      'liters': 'L',
-      'pint': 'pint',
-      'pints': 'pint',
-      'quart': 'quart',
-      'quarts': 'quart',
-      'gallon': 'gallon',
-      'gallons': 'gallon',
-      'clove': 'clove',
-      'cloves': 'clove',
-      'piece': 'piece',
-      'pieces': 'piece',
-      'slice': 'slice',
-      'slices': 'slice',
-      'strip': 'strip',
-      'strips': 'strip',
-      'bottle': 'bottle',
-      'bottles': 'bottle',
-      'can': 'can',
-      'cans': 'can',
-      'jar': 'jar',
-      'jars': 'jar',
-      'pkg': 'package',
-      'package': 'package',
-      'packages': 'package',
-    };
-
-    return unitMap[unitLower] || unit; // Return standardized unit or original if not found
-  }
-
-  private static parseIngredientText(ingredientText: string): { name: string; quantity?: string; unit?: string } {
-    const text = this.decodeHtmlEntities(ingredientText.trim());
-
-    // Common patterns for quantity and unit extraction
-    const patterns = [
-      // "1 to 2 ozs White Truffle Oil" -> quantity: "1 to 2", unit: "ozs", name: "White Truffle Oil"
-      /^(\d+(?:\.\d+)?(?:\/\d+)?\s+(?:to|-|or)\s+\d+(?:\.\d+)?(?:\/\d+)?)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
-      // "4 ozs Sweet Butter" -> quantity: "4", unit: "ozs", name: "Sweet Butter"
-      /^(\d+(?:\.\d+)?(?:\/\d+)?)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
-      // "1/2 cup sugar" -> quantity: "1/2", unit: "cup", name: "sugar"
-      /^(\d+\/\d+)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
-      // "1½ lbs cooked Elbow Pasta" -> quantity: "1½", unit: "lbs", name: "cooked Elbow Pasta"
-      /^(\d+½|\d+¼|\d+¾)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
-      // "¼ tsp ground Nutmeg" -> quantity: "¼", unit: "tsp", name: "ground Nutmeg"
-      /^(¼|½|¾|\d+¼|\d+½|\d+¾)\s+(ozs?|oz|c|cup|cups|tbsp|tablespoons?|tbs|tsp|teaspoons?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|bottles?|cans?|jars?|packages?|pkg)\s+(.+)$/i,
-      // "2 to 3 apples" -> quantity: "2 to 3", unit: "", name: "apples"
-      /^(\d+(?:\s+(?:to|-|or)\s+\d+)?)\s+(.+)$/,
-      // "A pinch of salt" -> quantity: "A pinch", unit: "", name: "salt"
-      /^(a pinch of|a dash of|a handful of)\s+(.+)$/i,
-    ];
-
-    console.log(`Parsing ingredient: "${text}"`);
-
-    for (let i = 0; i < patterns.length; i++) {
-      const pattern = patterns[i];
-      const match = text.match(pattern);
-      if (match) {
-        console.log(`Pattern ${i} matched:`, match);
-
-        // Check if this is a unit-based pattern (first five patterns)
-        if (i < 5 && match.length >= 4) {
-          // Has explicit unit - standardize it
-          const result = {
-            quantity: match[1],
-            unit: RecipeScraper.standardizeUnit(match[2]),
-            name: match[3]
-          };
-          console.log(`Parsed with unit:`, result);
-          return result;
-        } else if (match[1] && (match[1].includes('pinch') || match[1].includes('dash') || match[1].includes('handful'))) {
-          // Descriptive quantity
-          const result = {
-            quantity: match[1],
-            name: match[2]
-          };
-          console.log(`Parsed descriptive:`, result);
-          return result;
-        } else if (match.length >= 3) {
-          // Just number
-          const result = {
-            quantity: match[1],
-            name: match[2]
-          };
-          console.log(`Parsed with quantity:`, result);
-          return result;
-        }
-      }
-    }
-
-    // If no pattern matches, return as plain ingredient name
-    const result = { name: this.decodeHtmlEntities(text) };
-    console.log(`No pattern matched, using plain name:`, result);
-    return result;
+    
+    console.log(`No ingredients found with any method`);
+    return [];
   }
 }

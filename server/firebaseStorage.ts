@@ -52,13 +52,19 @@ export class FirebaseStorage implements IStorage {
     try {
       const snapshot = await db.collection(COLLECTIONS.RECIPES)
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
         .get();
 
-      return snapshot.docs.map(doc => ({
+      // Sort by createdAt on the client side instead
+      const recipes = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Recipe[];
+
+      return recipes.sort((a, b) => {
+        const aDate = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+        const bDate = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+        return bDate.getTime() - aDate.getTime();
+      });
     } catch (error) {
       console.error('Error getting recipes:', error);
       return [];
@@ -83,8 +89,12 @@ export class FirebaseStorage implements IStorage {
   async createRecipe(recipe: InsertRecipe, userId: string): Promise<Recipe> {
     try {
       const id = nanoid();
+      
+      // Clean up the recipe data to remove undefined values
+      const cleanedRecipe = this.cleanRecipeData(recipe);
+      
       const recipeData = {
-        ...recipe,
+        ...cleanedRecipe,
         userId,
         createdAt: new Date(),
       };
@@ -108,7 +118,11 @@ export class FirebaseStorage implements IStorage {
         throw new Error('Recipe not found or access denied');
       }
 
-      await recipeRef.update(recipe);
+      // Clean the partial recipe data
+      const cleanedRecipe = recipe as InsertRecipe;
+      const cleanedUpdate = this.cleanRecipeData(cleanedRecipe);
+
+      await recipeRef.update(cleanedUpdate);
       
       const updatedDoc = await recipeRef.get();
       return { id: updatedDoc.id, ...updatedDoc.data() } as Recipe;
@@ -141,7 +155,6 @@ export class FirebaseStorage implements IStorage {
       // This is a simple implementation - for production, consider using Algolia or similar
       const snapshot = await db.collection(COLLECTIONS.RECIPES)
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
         .get();
 
       const recipes = snapshot.docs.map(doc => ({
@@ -149,10 +162,16 @@ export class FirebaseStorage implements IStorage {
         ...doc.data()
       })) as Recipe[];
 
-      // Filter results on the client side
-      return recipes.filter(recipe => 
+      // Filter and sort results on the client side
+      const filteredRecipes = recipes.filter(recipe => 
         recipe.title.toLowerCase().includes(query.toLowerCase())
       );
+
+      return filteredRecipes.sort((a, b) => {
+        const aDate = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+        const bDate = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+        return bDate.getTime() - aDate.getTime();
+      });
     } catch (error) {
       console.error('Error searching recipes:', error);
       return [];
@@ -169,12 +188,25 @@ export class FirebaseStorage implements IStorage {
         query = query.where('date', '>=', startDate).where('date', '<=', endDate);
       }
 
-      const snapshot = await query.orderBy('date').orderBy('mealType').get();
+      const snapshot = await query.get();
 
-      return snapshot.docs.map(doc => ({
+      // Sort on client side to avoid composite index requirement
+      const mealPlans = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as MealPlan[];
+
+      return mealPlans.sort((a, b) => {
+        // First sort by date
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        
+        // Then sort by meal type
+        const mealTypeOrder = { 'breakfast': 1, 'lunch': 2, 'dinner': 3 };
+        const aMealType = mealTypeOrder[a.mealType.toLowerCase()] || 4;
+        const bMealType = mealTypeOrder[b.mealType.toLowerCase()] || 4;
+        return aMealType - bMealType;
+      });
     } catch (error) {
       console.error('Error getting meal plans:', error);
       return [];
@@ -241,14 +273,22 @@ export class FirebaseStorage implements IStorage {
     try {
       const snapshot = await db.collection(COLLECTIONS.SHOPPING_LIST)
         .where('userId', '==', userId)
-        .orderBy('category')
-        .orderBy('name')
         .get();
 
-      return snapshot.docs.map(doc => ({
+      // Sort on client side to avoid composite index requirement
+      const items = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as ShoppingListItem[];
+
+      return items.sort((a, b) => {
+        // First sort by category
+        const categoryCompare = (a.category || '').localeCompare(b.category || '');
+        if (categoryCompare !== 0) return categoryCompare;
+        
+        // Then sort by name
+        return a.name.localeCompare(b.name);
+      });
     } catch (error) {
       console.error('Error getting shopping list items:', error);
       return [];
@@ -380,6 +420,44 @@ export class FirebaseStorage implements IStorage {
       console.error('Error generating shopping list from meal plan:', error);
       return [];
     }
+  }
+
+  private cleanRecipeData(recipe: InsertRecipe): InsertRecipe {
+    // Clean ingredients sections
+    const cleanedIngredients = recipe.ingredients.map(section => ({
+      ...(section.sectionName !== undefined && { sectionName: section.sectionName }),
+      items: section.items.map(item => ({
+        name: item.name,
+        ...(item.quantity !== undefined && { quantity: item.quantity }),
+        ...(item.unit !== undefined && { unit: item.unit }),
+      }))
+    }));
+
+    // Clean instructions sections
+    const cleanedInstructions = recipe.instructions.map(section => ({
+      ...(section.sectionName !== undefined && { sectionName: section.sectionName }),
+      steps: section.steps.map(step => ({
+        text: step.text,
+        ...(step.imageUrl !== undefined && { imageUrl: step.imageUrl }),
+      }))
+    }));
+
+    // Return cleaned recipe with only defined values
+    return {
+      title: recipe.title,
+      ...(recipe.description !== undefined && { description: recipe.description }),
+      ...(recipe.cookTime !== undefined && { cookTime: recipe.cookTime }),
+      ...(recipe.servings !== undefined && { servings: recipe.servings }),
+      ...(recipe.category !== undefined && { category: recipe.category }),
+      ...(recipe.difficulty !== undefined && { difficulty: recipe.difficulty }),
+      rating: recipe.rating,
+      ...(recipe.imageUrl !== undefined && { imageUrl: recipe.imageUrl }),
+      ingredients: cleanedIngredients,
+      instructions: cleanedInstructions,
+      ...(recipe.sourceUrl !== undefined && { sourceUrl: recipe.sourceUrl }),
+      ...(recipe.videoUrl !== undefined && { videoUrl: recipe.videoUrl }),
+      isFavorite: recipe.isFavorite,
+    };
   }
 
   private categorizeIngredient(ingredient: string): string {
