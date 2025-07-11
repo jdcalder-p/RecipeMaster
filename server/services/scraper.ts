@@ -1316,10 +1316,7 @@ export class RecipeScraper {
         // Also filter out section headers that end with a colon and are very short
         const filteredInstructions = instructions.filter(inst => 
           inst.length > 15 && 
-          inst.length < 1000 && 
-          !inst.toLowerCase().includes('advertisement') &&
-          !inst.toLowerCase().includes('subscribe') &&
-          !(inst.endsWith(':') && inst.length < 50) && // Filter out section headers
+          !inst.endsWith(':') && 
           !inst.match(/^(step \d+|make the|cook the|prepare the|for the):?$/i) // Filter out common headers
         );
 
