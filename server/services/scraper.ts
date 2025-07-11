@@ -1350,6 +1350,7 @@ export class RecipeScraper {
       
       // Skip if we've already seen this exact ingredient
       if (seen.has(normalizedIngredient)) {
+        console.log(`🔍 Skipping exact duplicate: "${ingredient}"`);
         continue;
       }
 
@@ -1361,38 +1362,56 @@ export class RecipeScraper {
         const currentCore = this.extractCoreIngredientName(normalizedIngredient);
         const seenCore = this.extractCoreIngredientName(seenNormalized);
         
-        // Additional similarity checks
+        // Enhanced similarity checks
         const currentWords = normalizedIngredient.split(/\s+/).filter(w => w.length > 2);
         const seenWords = seenNormalized.split(/\s+/).filter(w => w.length > 2);
         
-        // Check if core names match OR if there's significant word overlap
-        const coreMatch = currentCore === seenCore && currentCore.length > 0;
-        const wordOverlap = currentWords.some(word => seenWords.includes(word)) && 
-                           (currentWords.length <= 3 || seenWords.length <= 3); // Only for short ingredient names
+        // Check if core names match
+        const coreMatch = currentCore === seenCore && currentCore.length > 2;
         
-        // Special cases for common ingredient patterns
-        const isPotatoVariant = /potato/i.test(normalizedIngredient) && /potato/i.test(seenNormalized);
-        const isBaconVariant = /bacon/i.test(normalizedIngredient) && /bacon/i.test(seenNormalized) && 
-                              !/bits/i.test(normalizedIngredient) !== !/bits/i.test(seenNormalized); // Different if one has "bits"
-        const isCheeseVariant = /cheese|cheddar/i.test(normalizedIngredient) && /cheese|cheddar/i.test(seenNormalized);
-        const isSourCreamVariant = /sour.*cream/i.test(normalizedIngredient) && /sour.*cream/i.test(seenNormalized);
-        const isShallotVariant = /shallot/i.test(normalizedIngredient) && /shallot/i.test(seenNormalized);
+        // Check for high word overlap (more than 50% of words match)
+        const commonWords = currentWords.filter(word => seenWords.includes(word));
+        const overlapRatio = commonWords.length / Math.min(currentWords.length, seenWords.length);
+        const significantOverlap = overlapRatio > 0.6 && commonWords.length >= 2;
         
-        if (coreMatch || wordOverlap || isPotatoVariant || isBaconVariant || isCheeseVariant || isSourCreamVariant || isShallotVariant) {
+        // Special cases for common ingredient patterns with exact matching
+        const isPotatoVariant = /\bpotato/i.test(normalizedIngredient) && /\bpotato/i.test(seenNormalized);
+        const isBaconVariant = /\bbacon\b/i.test(normalizedIngredient) && /\bbacon\b/i.test(seenNormalized);
+        const isSourCreamVariant = /\bsour\s+cream\b/i.test(normalizedIngredient) && /\bsour\s+cream\b/i.test(seenNormalized);
+        const isShallotVariant = /\bshallot/i.test(normalizedIngredient) && /\bshallot/i.test(seenNormalized);
+        const isCheeseVariant = (/\bcheddar\b/i.test(normalizedIngredient) && /\bcheddar\b/i.test(seenNormalized)) ||
+                               (/\bgoat\s+cheese\b/i.test(normalizedIngredient) && /\bgoat\s+cheese\b/i.test(seenNormalized)) ||
+                               (/\bparmesan\b/i.test(normalizedIngredient) && /\bparmesan\b/i.test(seenNormalized));
+        
+        // Check for bacon bits vs regular bacon (these should be different)
+        const isBaconBitsConflict = (/\bbacon\s+bits\b/i.test(normalizedIngredient) && /\bbacon\b/i.test(seenNormalized) && !/\bbits\b/i.test(seenNormalized)) ||
+                                   (/\bbacon\b/i.test(normalizedIngredient) && !/\bbits\b/i.test(normalizedIngredient) && /\bbacon\s+bits\b/i.test(seenNormalized));
+        
+        if ((coreMatch || significantOverlap || isPotatoVariant || isBaconVariant || isCheeseVariant || isSourCreamVariant || isShallotVariant) && !isBaconBitsConflict) {
           isDuplicate = true;
+          console.log(`🔍 Found duplicate: "${ingredient}" matches "${seenOriginal}"`);
+          
           // Keep the more detailed version (usually the one with quantity and specific descriptors)
-          const currentHasQuantity = /^\d+/.test(ingredient) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound)/.test(ingredient);
-          const seenHasQuantity = /^\d+/.test(seenOriginal) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound)/.test(seenOriginal);
+          const currentHasQuantity = /^\d+/.test(ingredient) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound|ounce)/.test(ingredient);
+          const seenHasQuantity = /^\d+/.test(seenOriginal) || /\d+\s*(cup|tbsp|tsp|oz|lb|pound|ounce)/.test(seenOriginal);
+          
+          // Prefer the version with more specific information
+          const currentSpecificity = (ingredient.match(/\b(large|medium|small|russet|white|sharp|shredded|grated|crumbled|optional)\b/gi) || []).length;
+          const seenSpecificity = (seenOriginal.match(/\b(large|medium|small|russet|white|sharp|shredded|grated|crumbled|optional)\b/gi) || []).length;
           
           if ((currentHasQuantity && !seenHasQuantity) || 
-              (currentHasQuantity === seenHasQuantity && ingredient.length > seenOriginal.length)) {
+              (currentHasQuantity === seenHasQuantity && currentSpecificity > seenSpecificity) ||
+              (currentHasQuantity === seenHasQuantity && currentSpecificity === seenSpecificity && ingredient.length > seenOriginal.length)) {
             // Replace with more detailed version
             const seenIndex = uniqueIngredients.indexOf(seenOriginal);
             if (seenIndex !== -1) {
+              console.log(`🔄 Replacing "${seenOriginal}" with "${ingredient}"`);
               uniqueIngredients[seenIndex] = ingredient;
               seen.delete(seenNormalized);
               seen.set(normalizedIngredient, ingredient);
             }
+          } else {
+            console.log(`🔄 Keeping existing "${seenOriginal}" over "${ingredient}"`);
           }
           break;
         }
@@ -1401,9 +1420,11 @@ export class RecipeScraper {
       if (!isDuplicate) {
         seen.set(normalizedIngredient, ingredient);
         uniqueIngredients.push(ingredient);
+        console.log(`✅ Added unique ingredient: "${ingredient}"`);
       }
     }
 
+    console.log(`📊 Final unique ingredients count: ${uniqueIngredients.length}`);
     return uniqueIngredients;
   }
 
