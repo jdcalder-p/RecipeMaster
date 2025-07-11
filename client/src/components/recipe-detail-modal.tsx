@@ -30,16 +30,16 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   // Helper function to parse ingredient text into components
   const parseIngredientText = (text: string): { name: string; quantity?: string; unit?: string } => {
     const cleanText = text.trim();
-    
+
     // Common units pattern
     const unitPattern = /\b(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\b/i;
-    
+
     // Try to match: quantity + unit + ingredient
     const fullPattern = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?(?:\s*\d+(?:\s*\/\s*\d+)?)*|\d*[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\s+(.+)/i;
-    
+
     // Try to match: quantity + ingredient (no unit)
     const quantityPattern = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?(?:\s*\d+(?:\s*\/\s*\d+)?)*|\d*[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])\s+(.+)/;
-    
+
     const fullMatch = cleanText.match(fullPattern);
     if (fullMatch) {
       return {
@@ -48,7 +48,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
         name: fullMatch[3].trim()
       };
     }
-    
+
     const quantityMatch = cleanText.match(quantityPattern);
     if (quantityMatch) {
       return {
@@ -56,11 +56,63 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
         name: quantityMatch[2].trim()
       };
     }
-    
+
     // No quantity found, return as is
     return {
       name: cleanText
     };
+  };
+
+  // Helper function to scale ingredient quantities
+  const formatNumber = (num: number): string => {
+    // Handle very small numbers (round to 0)
+    if (num < 0.01) return '0';
+
+    // Convert common decimal values back to fractions
+    const fractionMap: { [key: string]: string } = {
+      '0.125': '⅛',
+      '0.25': '¼',
+      '0.33': '⅓',
+      '0.333': '⅓',
+      '0.375': '⅜',
+      '0.5': '½',
+      '0.625': '⅝',
+      '0.66': '⅔',
+      '0.667': '⅔',
+      '0.75': '¾',
+      '0.875': '⅞'
+    };
+
+    const rounded = Math.round(num * 1000) / 1000;
+    const decimalPart = rounded % 1;
+    const wholePart = Math.floor(rounded);
+
+    // Check if the decimal part matches a known fraction
+    const decimalKey = decimalPart.toFixed(3);
+    if (fractionMap[decimalKey]) {
+      return wholePart > 0 ? `${wholePart}${fractionMap[decimalKey]}` : fractionMap[decimalKey];
+    }
+
+    // Check for other common fractions
+    if (Math.abs(decimalPart - 1/3) < 0.01) {
+      return wholePart > 0 ? `${wholePart}⅓` : '⅓';
+    }
+    if (Math.abs(decimalPart - 2/3) < 0.01) {
+      return wholePart > 0 ? `${wholePart}⅔` : '⅔';
+    }
+    if (Math.abs(decimalPart - 1/8) < 0.01) {
+      return wholePart > 0 ? `${wholePart}⅛` : '⅛';
+    }
+    if (Math.abs(decimalPart - 5/8) < 0.01) {
+      return wholePart > 0 ? `${wholePart}⅝` : '⅝';
+    }
+
+    // If no exact fraction match, show as decimal but round to reasonable precision
+    if (decimalPart < 0.01) {
+      return wholePart.toString();
+    }
+
+    return rounded.toString();
   };
 
   // Helper function to scale ingredient quantities
@@ -110,7 +162,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
 
       const scaledStart = parseQuantityPart(rangeMatch[1]) * multiplier;
       const scaledEnd = parseQuantityPart(rangeMatch[2]) * multiplier;
-      
+
       return `${formatNumber(scaledStart)} to ${formatNumber(scaledEnd)}${unit ? ` ${unit}` : ''} ${name}`;
     }
 
@@ -146,58 +198,6 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
 
       // Handle regular numbers
       return parseFloat(qty);
-    };
-
-    // Helper function to format numbers back to fractions when appropriate
-    const formatNumber = (num: number): string => {
-      // Handle very small numbers (round to 0)
-      if (num < 0.01) return '0';
-      
-      // Convert common decimal values back to fractions
-      const fractionMap: { [key: string]: string } = {
-        '0.125': '⅛',
-        '0.25': '¼',
-        '0.33': '⅓',
-        '0.333': '⅓',
-        '0.375': '⅜',
-        '0.5': '½',
-        '0.625': '⅝',
-        '0.66': '⅔',
-        '0.667': '⅔',
-        '0.75': '¾',
-        '0.875': '⅞'
-      };
-
-      const rounded = Math.round(num * 1000) / 1000;
-      const decimalPart = rounded % 1;
-      const wholePart = Math.floor(rounded);
-      
-      // Check if the decimal part matches a known fraction
-      const decimalKey = decimalPart.toFixed(3);
-      if (fractionMap[decimalKey]) {
-        return wholePart > 0 ? `${wholePart}${fractionMap[decimalKey]}` : fractionMap[decimalKey];
-      }
-
-      // Check for other common fractions
-      if (Math.abs(decimalPart - 1/3) < 0.01) {
-        return wholePart > 0 ? `${wholePart}⅓` : '⅓';
-      }
-      if (Math.abs(decimalPart - 2/3) < 0.01) {
-        return wholePart > 0 ? `${wholePart}⅔` : '⅔';
-      }
-      if (Math.abs(decimalPart - 1/8) < 0.01) {
-        return wholePart > 0 ? `${wholePart}⅛` : '⅛';
-      }
-      if (Math.abs(decimalPart - 5/8) < 0.01) {
-        return wholePart > 0 ? `${wholePart}⅝` : '⅝';
-      }
-
-      // If no exact fraction match, show as decimal but round to reasonable precision
-      if (decimalPart < 0.01) {
-        return wholePart.toString();
-      }
-      
-      return rounded.toString();
     };
 
     // Parse the quantity
