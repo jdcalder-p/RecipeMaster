@@ -298,17 +298,20 @@ export class RecipeScraper {
 
 
 
-    // If instructions are empty or only contain section headers, create a fallback
-    const processedInstructions = instructions.filter(Boolean);
-    const hasValidInstructions = processedInstructions.some(inst => 
-      inst.length > 15 && 
-      !inst.endsWith(':') && 
-      !inst.match(/^(step \d+|make the|cook the|prepare the|for the):?$/i)
-    );
+    // Check if we have valid parsed instruction sections
+    const hasValidInstructionSections = instructions.length > 0 && 
+      instructions.some(section => section.steps && section.steps.length > 0 && 
+        section.steps.some(step => step.text && step.text.trim().length > 15));
 
-    const finalInstructions = hasValidInstructions 
-      ? [{ steps: processedInstructions.map(text => ({ text })) }]
-      : [{ steps: [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }] }];
+    let finalInstructions;
+    
+    if (hasValidInstructionSections) {
+      console.log(`📋 Using ${instructions.length} parsed instruction sections`);
+      finalInstructions = instructions;
+    } else {
+      console.log(`📋 No valid instruction sections found, using fallback`);
+      finalInstructions = [{ steps: [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }] }];
+    }
 
     return {
       title: recipe.name || '',
@@ -1127,8 +1130,12 @@ export class RecipeScraper {
   }> {
     if (!Array.isArray(instructions)) return [];
 
+    console.log(`📋 Parsing ${instructions.length} instruction items`);
+    
     // Handle both flat array and nested object structures
-    const processedInstructions = instructions.map(instruction => {
+    const processedInstructions = instructions.map((instruction, index) => {
+      console.log(`📋 Processing instruction ${index + 1}:`, instruction['@type'] || 'unknown type');
+      
       if (typeof instruction === 'string') {
         return {
           sectionName: undefined,
@@ -1143,7 +1150,7 @@ export class RecipeScraper {
         };
       }
 
-      if (instruction.name) {
+      if (instruction.name && !instruction['@type']) {
         return {
           sectionName: undefined,
           steps: [{ text: instruction.name }]
@@ -1152,9 +1159,11 @@ export class RecipeScraper {
 
       // Handle HowToStep objects
       if (instruction['@type'] === 'HowToStep') {
+        const stepText = instruction.text || instruction.name || '';
+        console.log(`📋 Found HowToStep: "${stepText.substring(0, 50)}..."`);
         return {
           sectionName: undefined,
-          steps: [{ text: instruction.text || instruction.name || '' }]
+          steps: [{ text: stepText }]
         };
       }
 
@@ -1163,27 +1172,37 @@ export class RecipeScraper {
         const sectionName = instruction.name || undefined;
         const steps = [];
 
+        console.log(`📋 Found HowToSection: "${sectionName}"`);
+
         if (instruction.itemListElement && Array.isArray(instruction.itemListElement)) {
-          instruction.itemListElement.forEach(item => {
+          console.log(`📋 Processing ${instruction.itemListElement.length} items in section`);
+          instruction.itemListElement.forEach((item, itemIndex) => {
             if (item['@type'] === 'HowToStep' && (item.text || item.name)) {
-              steps.push({ text: item.text || item.name || '' });
+              const stepText = item.text || item.name || '';
+              console.log(`📋 Adding step ${itemIndex + 1}: "${stepText.substring(0, 50)}..."`);
+              steps.push({ text: stepText });
             }
           });
         }
 
+        console.log(`📋 Section "${sectionName}" has ${steps.length} steps`);
         return {
           sectionName,
           steps
         };
       }
 
+      console.log(`📋 Unknown instruction type, skipping:`, instruction['@type']);
       return null;
     }).filter(Boolean);
+
+    console.log(`📋 Processed ${processedInstructions.length} instruction sections`);
 
     // If we have HowToSection objects with section names, return them as-is
     const hasSections = processedInstructions.some(inst => inst.sectionName);
     if (hasSections) {
       console.log(`📋 Found ${processedInstructions.length} instruction sections with names`);
+      console.log(`📋 Section names:`, processedInstructions.map(inst => inst.sectionName).filter(Boolean));
       return processedInstructions;
     }
 
@@ -1192,6 +1211,7 @@ export class RecipeScraper {
       // Check if all are single steps - if so, combine them into one section
       const allSingleSteps = processedInstructions.every(inst => inst.steps.length === 1);
       if (allSingleSteps) {
+        console.log(`📋 Combining ${processedInstructions.length} single steps into one section`);
         return [{
           sectionName: undefined,
           steps: processedInstructions.map(inst => inst.steps[0])
@@ -1199,6 +1219,7 @@ export class RecipeScraper {
       }
     }
 
+    console.log(`📋 Returning ${processedInstructions.length} instruction sections`);
     return processedInstructions;
   }
 
