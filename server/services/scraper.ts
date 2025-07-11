@@ -559,6 +559,29 @@ export class RecipeScraper {
     // Clean up the text
     const cleanText = ingredientText.trim().replace(/^\d+\.\s*/, ''); // Remove numbering
 
+    // Handle "or" ranges in quantities like "1 or 2 Shallots"
+    const orRangeRegex = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?)\s+(?:or|to|-)\s+(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)?\s+(.+)/i;
+    const orRangeMatch = cleanText.match(orRangeRegex);
+
+    if (orRangeMatch) {
+      return {
+        quantity: `${orRangeMatch[1]} to ${orRangeMatch[2]}`,
+        unit: orRangeMatch[3] || undefined,
+        name: orRangeMatch[4].trim()
+      };
+    }
+
+    // Handle "or" ranges without units like "1 or 2 Shallots"
+    const simpleOrRangeRegex = /^(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?)\s+(?:or|to|-)\s+(\d+(?:\s*\/\s*\d+)?(?:\.\d+)?)\s+(.+)/i;
+    const simpleOrRangeMatch = cleanText.match(simpleOrRangeRegex);
+
+    if (simpleOrRangeMatch) {
+      return {
+        quantity: `${simpleOrRangeMatch[1]} to ${simpleOrRangeMatch[2]}`,
+        name: simpleOrRangeMatch[3].trim()
+      };
+    }
+
     // Common measurement patterns
     const measurementRegex = /^(\d+(?:\/\d+)?(?:\.\d+)?)\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?)\s+(.+)/i;
 
