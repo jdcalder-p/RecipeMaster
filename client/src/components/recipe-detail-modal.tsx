@@ -493,20 +493,20 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
 
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Instructions</h2>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {recipe.instructions.map((section, sectionIndex) => {
                   let stepCounter = recipe.instructions
                     .slice(0, sectionIndex)
                     .reduce((acc, sec) => acc + (sec.steps?.length || 0), 0);
 
                   return (
-                    <div key={sectionIndex} className="space-y-3">
+                    <div key={sectionIndex} className="space-y-2">
                       {section.sectionName && (
-                        <h3 className="text-lg font-medium text-gray-800 border-b border-gray-200 pb-2 mt-4 first:mt-0">
+                        <h3 className="text-lg font-medium text-gray-800 border-b border-gray-200 pb-1 mt-3 first:mt-0">
                           {section.sectionName}
                         </h3>
                       )}
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {(section.steps || []).map((step, stepIndex) => {
                           stepCounter++;
                           return (
