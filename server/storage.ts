@@ -1,5 +1,3 @@
-import { users, recipes, mealPlans, shoppingListItems } from '@shared/schema';
-import { db } from './db';
 import {
   Recipe,
   InsertRecipe,
@@ -10,8 +8,7 @@ import {
   User,
   UpsertUser
 } from '@shared/schema';
-import { eq, ilike, gte, lte, and, desc, inArray } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
+import { FirebaseStorage } from './firebaseStorage';
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -309,4 +306,4 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new FirebaseStorage();

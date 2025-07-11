@@ -122,14 +122,47 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
         setIngredientSections([{ items: [{ name: "" }] }]);
       }
       
-      // Handle both old string format and new object format
+      // Handle both old string format and new section format with steps
       if (recipe.instructions && recipe.instructions.length > 0) {
-        const formattedInstructions = recipe.instructions.map((instruction: any) => 
-          typeof instruction === 'string' 
-            ? { text: instruction } 
-            : instruction
+        let formattedInstructions: { text: string; imageUrl?: string }[] = [];
+        
+        recipe.instructions.forEach((instruction: any) => {
+          if (typeof instruction === 'string') {
+            // Old format: direct string
+            formattedInstructions.push({ text: instruction });
+          } else if (instruction.steps && Array.isArray(instruction.steps)) {
+            // New format: section with steps array
+            instruction.steps.forEach((step: any) => {
+              if (typeof step === 'string') {
+                formattedInstructions.push({ text: step });
+              } else if (step.text) {
+                formattedInstructions.push({ 
+                  text: step.text, 
+                  imageUrl: step.imageUrl 
+                });
+              }
+            });
+          } else if (instruction.text) {
+            // Direct object with text property
+            formattedInstructions.push({ 
+              text: instruction.text, 
+              imageUrl: instruction.imageUrl 
+            });
+          }
+        });
+        
+        // Filter out empty instructions and section headers that are too short
+        const validInstructions = formattedInstructions.filter(inst => 
+          inst.text && 
+          inst.text.trim().length > 0 &&
+          !inst.text.match(/^(makes?\s+\d+|serves?\s+\d+)/i) // Filter out serving size headers
         );
-        setInstructions(formattedInstructions);
+        
+        if (validInstructions.length > 0) {
+          setInstructions(validInstructions);
+        } else {
+          setInstructions([{ text: "" }]);
+        }
       } else {
         setInstructions([{ text: "" }]);
       }

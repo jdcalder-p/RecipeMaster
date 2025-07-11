@@ -1,111 +1,122 @@
-import {
-  pgTable,
-  text,
-  varchar,
-  serial,
-  integer,
-  boolean,
-  jsonb,
-  timestamp,
-  index,
-} from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
+
 import { z } from "zod";
 
-// Session storage table for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
+// Remove PostgreSQL-specific imports and keep only the types we need
 
-// User storage table for Replit Auth
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export const insertRecipeSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  cookTime: z.string().optional(),
+  servings: z.number().optional(),
+  category: z.string().optional(),
+  difficulty: z.string().optional(),
+  rating: z.number().default(0),
+  imageUrl: z.string().optional(),
+  ingredients: z.array(z.object({
+    sectionName: z.string().optional(),
+    items: z.array(z.object({
+      name: z.string().min(1, "Ingredient name is required"),
+      quantity: z.string().optional(),
+      unit: z.string().optional(),
+    })).min(1, "At least one ingredient is required"),
+  })).min(1, "At least one ingredient section is required"),
+  instructions: z.array(z.object({
+    sectionName: z.string().optional(),
+    steps: z.array(z.object({
+      text: z.string().min(1, "Instruction text is required"),
+      imageUrl: z.string().optional(),
+    })).min(1, "At least one step is required"),
+  })).min(1, "At least one instruction section is required"),
+  sourceUrl: z.string().optional(),
+  videoUrl: z.string().optional(),
+  isFavorite: z.boolean().default(false),
 });
 
-export const recipes = pgTable("recipes", {
-  id: text("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  title: text("title").notNull(),
-  description: text("description"),
-  cookTime: text("cook_time"),
-  servings: integer("servings"),
-  category: text("category"),
-  difficulty: text("difficulty"),
-  rating: integer("rating").default(0),
-  imageUrl: text("image_url"),
-  ingredients: jsonb("ingredients").$type<{
+export const insertMealPlanSchema = z.object({
+  date: z.string().min(1, "Date is required"), // YYYY-MM-DD format
+  mealType: z.string().min(1, "Meal type is required"), // breakfast, lunch, dinner
+  recipeId: z.string().optional(),
+});
+
+export const insertShoppingListItemSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  quantity: z.string().optional(),
+  category: z.string().optional(),
+  isCompleted: z.boolean().default(false),
+  recipeId: z.string().optional(),
+});
+
+// Type definitions for Firebase
+export type UpsertUser = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+};
+
+export type User = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+  createdAt: Date;
+  updatedAt?: Date;
+};
+
+export type Recipe = {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  cookTime?: string;
+  servings?: number;
+  category?: string;
+  difficulty?: string;
+  rating: number;
+  imageUrl?: string;
+  ingredients: {
     sectionName?: string;
     items: {
       name: string;
       quantity?: string;
       unit?: string;
     }[];
-  }[]>().notNull().default([]),
-  instructions: jsonb("instructions").$type<{
-    text: string;
-    imageUrl?: string;
-  }[]>().notNull().default([]),
-  sourceUrl: text("source_url"),
-  videoUrl: text("video_url"),
-  isFavorite: boolean("is_favorite").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+  }[];
+  instructions: {
+    sectionName?: string;
+    steps: {
+      text: string;
+      imageUrl?: string;
+    }[];
+  }[];
+  sourceUrl?: string;
+  videoUrl?: string;
+  isFavorite: boolean;
+  createdAt: Date;
+};
 
-export const mealPlans = pgTable("meal_plans", {
-  id: text("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  date: text("date").notNull(), // YYYY-MM-DD format
-  mealType: text("meal_type").notNull(), // breakfast, lunch, dinner
-  recipeId: text("recipe_id").references(() => recipes.id),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export type MealPlan = {
+  id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD format
+  mealType: string; // breakfast, lunch, dinner
+  recipeId?: string;
+  createdAt: Date;
+};
 
-export const shoppingListItems = pgTable("shopping_list_items", {
-  id: text("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  name: text("name").notNull(),
-  quantity: text("quantity"),
-  category: text("category"),
-  isCompleted: boolean("is_completed").default(false),
-  recipeId: text("recipe_id").references(() => recipes.id),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export type ShoppingListItem = {
+  id: string;
+  userId: string;
+  name: string;
+  quantity?: string;
+  category?: string;
+  isCompleted: boolean;
+  recipeId?: string;
+  createdAt: Date;
+};
 
-export const insertRecipeSchema = createInsertSchema(recipes).omit({
-  id: true,
-  userId: true,
-  createdAt: true,
-});
-
-export const insertMealPlanSchema = createInsertSchema(mealPlans).omit({
-  id: true,
-  userId: true,
-  createdAt: true,
-});
-
-export const insertShoppingListItemSchema = createInsertSchema(shoppingListItems).omit({
-  id: true,
-  userId: true,
-  createdAt: true,
-});
-
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
-export type Recipe = typeof recipes.$inferSelect;
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
-export type MealPlan = typeof mealPlans.$inferSelect;
 export type InsertMealPlan = z.infer<typeof insertMealPlanSchema>;
-export type ShoppingListItem = typeof shoppingListItems.$inferSelect;
 export type InsertShoppingListItem = z.infer<typeof insertShoppingListItemSchema>;

@@ -41,10 +41,6 @@ const formSchema = insertRecipeSchema.extend({
       unit: z.string().optional(),
     })).min(1, "At least one ingredient is required"),
   })).min(1, "At least one ingredient section is required"),
-  instructions: z.array(z.object({
-    text: z.string().min(1, "Instruction text is required"),
-    imageUrl: z.string().optional(),
-  })).min(1, "At least one instruction is required"),
 });
 
 interface AddRecipeModalProps {
@@ -58,7 +54,10 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     sectionName?: string;
     items: { name: string; quantity?: string; unit?: string; }[];
   }[]>([{ items: [{ name: "" }] }]);
-  const [instructions, setInstructions] = useState<{text: string; imageUrl?: string}[]>([{text: ""}]);
+  const [instructionSections, setInstructionSections] = useState<{
+    sectionName?: string;
+    steps: { text: string; imageUrl?: string; }[];
+  }[]>([{ steps: [{ text: "" }] }]);
   const [servingSize, setServingSize] = useState(4);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -82,14 +81,14 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
       category: "",
       imageUrl: "",
       ingredients: [{ items: [{ name: "" }] }],
-      instructions: [{ text: "" }],
+      instructions: [{ steps: [{ text: "" }] }],
     },
   });
 
-  // Sync instructions state with form
+  // Sync instruction sections state with form
   useEffect(() => {
-    setValue("instructions", instructions);
-  }, [instructions, setValue]);
+    setValue("instructions", instructionSections);
+  }, [instructionSections, setValue]);
 
   const importMutation = useMutation({
     mutationFn: async (url: string) => {
@@ -140,10 +139,10 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
   const resetForm = () => {
     reset();
     setIngredientSections([{ items: [{ name: "" }] }]);
-    setInstructions([{text: ""}]);
+    setInstructionSections([{ steps: [{ text: "" }] }]);
     setImportUrl("");
     setValue("ingredients", [{ items: [{ name: "" }] }]);
-    setValue("instructions", [{text: ""}]);
+    setValue("instructions", [{ steps: [{ text: "" }] }]);
   };
 
   const onSubmit = (data: InsertRecipe) => {
@@ -158,7 +157,10 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
         }))
     })).filter(section => section.items.length > 0);
     
-    const filteredInstructions = instructions.filter(inst => inst.text.trim() !== "");
+    const filteredInstructionSections = instructionSections.map(section => ({
+      ...section,
+      steps: section.steps.filter(step => step.text.trim() !== "")
+    })).filter(section => section.steps.length > 0);
     
     if (filteredSections.length === 0) {
       toast({
@@ -169,7 +171,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
       return;
     }
     
-    if (filteredInstructions.length === 0) {
+    if (filteredInstructionSections.length === 0) {
       toast({
         title: "Validation Error", 
         description: "Please add at least one instruction",
@@ -181,7 +183,7 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     createMutation.mutate({
       ...data,
       ingredients: filteredSections,
-      instructions: filteredInstructions,
+      instructions: filteredInstructionSections,
     });
   };
 
@@ -241,30 +243,51 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
     setValue("ingredients", newSections);
   };
 
-  const addInstruction = () => {
-    const newInstructions = [...instructions, { text: "" }];
-    setInstructions(newInstructions);
-    setValue("instructions", newInstructions);
-    // Focus on the new instruction field after state update
-    setTimeout(() => {
-      const newIndex = newInstructions.length - 1;
-      instructionRefs.current[newIndex]?.focus();
-    }, 0);
+  const addInstructionSection = () => {
+    const newSections = [...instructionSections, { steps: [{ text: "" }] }];
+    setInstructionSections(newSections);
+    setValue("instructions", newSections);
   };
 
-  const removeInstruction = (index: number) => {
-    if (instructions.length > 1) {
-      const newInstructions = instructions.filter((_, i) => i !== index);
-      setInstructions(newInstructions);
-      setValue("instructions", newInstructions);
+  const removeInstructionSection = (sectionIndex: number) => {
+    if (instructionSections.length > 1) {
+      const newSections = instructionSections.filter((_, i) => i !== sectionIndex);
+      setInstructionSections(newSections);
+      setValue("instructions", newSections);
     }
   };
 
-  const updateInstruction = (index: number, field: 'text' | 'imageUrl', value: string) => {
-    const newInstructions = [...instructions];
-    newInstructions[index] = { ...newInstructions[index], [field]: value };
-    setInstructions(newInstructions);
-    setValue("instructions", newInstructions);
+  const updateInstructionSectionName = (sectionIndex: number, name: string) => {
+    const newSections = [...instructionSections];
+    newSections[sectionIndex].sectionName = name || undefined;
+    setInstructionSections(newSections);
+    setValue("instructions", newSections);
+  };
+
+  const addStepToSection = (sectionIndex: number) => {
+    const newSections = [...instructionSections];
+    newSections[sectionIndex].steps.push({ text: "" });
+    setInstructionSections(newSections);
+    setValue("instructions", newSections);
+  };
+
+  const removeStepFromSection = (sectionIndex: number, stepIndex: number) => {
+    const newSections = [...instructionSections];
+    if (newSections[sectionIndex].steps.length > 1) {
+      newSections[sectionIndex].steps.splice(stepIndex, 1);
+      setInstructionSections(newSections);
+      setValue("instructions", newSections);
+    }
+  };
+
+  const updateInstructionStep = (sectionIndex: number, stepIndex: number, field: 'text' | 'imageUrl', value: string) => {
+    const newSections = [...instructionSections];
+    newSections[sectionIndex].steps[stepIndex] = { 
+      ...newSections[sectionIndex].steps[stepIndex], 
+      [field]: value 
+    };
+    setInstructionSections(newSections);
+    setValue("instructions", newSections);
   };
 
   const onDragEnd = (result: DropResult) => {
@@ -578,65 +601,109 @@ export function AddRecipeModal({ open, onOpenChange }: AddRecipeModalProps) {
               </div>
 
               <div>
-                <Label>Instructions</Label>
-                <div className="space-y-2">
-                  {instructions.map((instruction, index) => (
-                    <div key={index} className="border rounded-lg p-3 space-y-3">
-                      <div className="flex items-start space-x-2">
-                        <div className="text-sm font-medium text-gray-500 mt-3 min-w-[2rem]">
-                          {index + 1}.
-                        </div>
-                        <Textarea
-                          ref={(el) => instructionRefs.current[index] = el}
-                          placeholder="Describe this step..."
-                          value={instruction.text}
-                          onChange={(e) => updateInstruction(index, 'text', e.target.value)}
-                          className="flex-1"
-                          rows={2}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeInstruction(index)}
-                          disabled={instructions.length === 1}
-                          className="mt-2"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="ml-8">
-                        <Input
-                          placeholder="Optional photo URL for this step..."
-                          value={instruction.imageUrl || ""}
-                          onChange={(e) => updateInstruction(index, 'imageUrl', e.target.value)}
-                          className="text-sm"
-                        />
-                        {instruction.imageUrl && (
-                          <div className="mt-2">
-                            <img 
-                              src={instruction.imageUrl} 
-                              alt={`Step ${index + 1} preview`}
-                              className="rounded-lg max-w-full h-32 object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between mb-3">
+                  <Label>Instructions</Label>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    onClick={addInstruction}
-                    className="mt-2"
+                    onClick={addInstructionSection}
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Step
+                    Add Section
                   </Button>
+                </div>
+                
+                <div className="space-y-4">
+                  {instructionSections.map((section, sectionIndex) => (
+                    <Card key={sectionIndex} className="p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            placeholder="Section name (optional, e.g., 'Prepare the sauce', 'Cook the chicken')"
+                            value={section.sectionName || ""}
+                            onChange={(e) => updateInstructionSectionName(sectionIndex, e.target.value)}
+                            className="flex-1"
+                          />
+                          {instructionSections.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeInstructionSection(sectionIndex)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-2 pl-4 border-l-2 border-gray-200">
+                          {section.steps.map((step, stepIndex) => {
+                            const stepNumber = instructionSections
+                              .slice(0, sectionIndex)
+                              .reduce((acc, sec) => acc + sec.steps.length, 0) + stepIndex + 1;
+                            
+                            return (
+                              <div key={stepIndex} className="border rounded-lg p-3 space-y-3">
+                                <div className="flex items-start space-x-2">
+                                  <div className="text-sm font-medium text-gray-500 mt-3 min-w-[2rem]">
+                                    {stepNumber}.
+                                  </div>
+                                  <Textarea
+                                    placeholder="Describe this step..."
+                                    value={step.text}
+                                    onChange={(e) => updateInstructionStep(sectionIndex, stepIndex, 'text', e.target.value)}
+                                    className="flex-1"
+                                    rows={2}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeStepFromSection(sectionIndex, stepIndex)}
+                                    disabled={section.steps.length === 1}
+                                    className="mt-2"
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <div className="ml-8">
+                                  <Input
+                                    placeholder="Optional photo URL for this step..."
+                                    value={step.imageUrl || ""}
+                                    onChange={(e) => updateInstructionStep(sectionIndex, stepIndex, 'imageUrl', e.target.value)}
+                                    className="text-sm"
+                                  />
+                                  {step.imageUrl && (
+                                    <div className="mt-2">
+                                      <img 
+                                        src={step.imageUrl} 
+                                        alt={`Step ${stepNumber} preview`}
+                                        className="rounded-lg max-w-full h-32 object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => addStepToSection(sectionIndex)}
+                            className="mt-2"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Step
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               </div>
 

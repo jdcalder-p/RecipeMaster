@@ -30,19 +30,224 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   // Helper function to scale ingredient quantities
   const scaleIngredientItem = (item: { name: string; quantity?: string; unit?: string }, multiplier: number): string => {
     const { name, quantity, unit } = item;
-    
+
     if (!quantity) {
       return name;
     }
 
-    // Extract numbers from quantity using regex
-    const numberPattern = /(\d+\.?\d*|\d*\.?\d+)/g;
-    const scaledQuantity = quantity.replace(numberPattern, (match) => {
-      const num = parseFloat(match);
-      const scaled = num * multiplier;
-      // Round to 2 decimal places and remove trailing zeros
-      return (scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(2).replace(/\.?0+$/, ''));
-    });
+    // Handle Unicode fractions
+    const unicodeFractions: { [key: string]: number } = {
+      '¼': 0.25,
+      '½': 0.5, 
+      '¾': 0.75,
+      '⅓': 1/3,
+      '⅔': 2/3,
+      '⅛': 0.125,
+      '⅜': 0.375,
+      '⅝': 0.625,
+      '⅞': 0.875,
+      '⅙': 1/6,
+      '⅚': 5/6
+    };
+
+    // Check for range quantities like "1 to 2", "1-2", "1 or 2"
+    const rangeMatch = quantity.trim().match(/^(\d+(?:\.\d+)?(?:[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])?(?:\/\d+)?)\s+(?:to|-|or)\s+(\d+(?:\.\d+)?(?:[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])?(?:\/\d+)?)$/i);
+    
+    if (rangeMatch) {
+      // Parse both parts of the range
+      const parseQuantityPart = (part: string): number => {
+        if (unicodeFractions[part]) {
+          return unicodeFractions[part];
+        }
+        if (/\d+[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚]/.test(part)) {
+          const match = part.match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])$/);
+          if (match) {
+            return parseInt(match[1]) + unicodeFractions[match[2]];
+          }
+        }
+        if (part.includes('/')) {
+          const [num, denom] = part.split('/').map(Number);
+          return num / denom;
+        }
+        return parseFloat(part);
+      };
+
+      const firstValue = parseQuantityPart(rangeMatch[1]);
+      const secondValue = parseQuantityPart(rangeMatch[2]);
+      
+      // Scale both values
+      const scaledFirst = firstValue * multiplier;
+      const scaledSecond = secondValue * multiplier;
+      
+      // Convert both scaled values to fraction format
+      const formatNumber = (num: number): string => {
+        const tolerance = 0.001;
+        const commonFractions = [
+          { decimal: 1/4, fraction: '¼' },
+          { decimal: 1/3, fraction: '⅓' },
+          { decimal: 1/2, fraction: '½' },
+          { decimal: 2/3, fraction: '⅔' },
+          { decimal: 3/4, fraction: '¾' },
+          { decimal: 1/8, fraction: '⅛' },
+          { decimal: 3/8, fraction: '⅜' },
+          { decimal: 5/8, fraction: '⅝' },
+          { decimal: 7/8, fraction: '⅞' },
+          { decimal: 1/6, fraction: '⅙' },
+          { decimal: 5/6, fraction: '⅚' },
+        ];
+
+        const wholePart = Math.floor(num);
+        const fractionalPart = num - wholePart;
+
+        // Check if the entire number matches a common fraction
+        for (const { decimal, fraction } of commonFractions) {
+          if (Math.abs(num - decimal) < tolerance) {
+            return fraction;
+          }
+        }
+
+        // Check if just the fractional part matches
+        for (const { decimal, fraction } of commonFractions) {
+          if (Math.abs(fractionalPart - decimal) < tolerance) {
+            return wholePart > 0 ? `${wholePart} ${fraction}` : fraction;
+          }
+        }
+
+        // Try to convert to simple fraction
+        if (fractionalPart > 0) {
+          for (let denom = 2; denom <= 16; denom++) {
+            const numerator = Math.round(fractionalPart * denom);
+            if (Math.abs(fractionalPart - numerator / denom) < tolerance) {
+              const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+              const commonDivisor = gcd(numerator, denom);
+              const finalNum = numerator / commonDivisor;
+              const finalDenom = denom / commonDivisor;
+              
+              if (finalDenom !== 1) {
+                return wholePart > 0 ? `${wholePart} ${finalNum}/${finalDenom}` : `${finalNum}/${finalDenom}`;
+              }
+            }
+          }
+        }
+
+        // For whole numbers
+        if (num % 1 === 0) {
+          return num.toString();
+        }
+
+        // As decimal if we can't convert to a nice fraction
+        return num.toFixed(2).replace(/\.?0+$/, '');
+      };
+
+      const scaledQuantity = `${formatNumber(scaledFirst)} to ${formatNumber(scaledSecond)}`;
+      return `${scaledQuantity}${unit ? ' ' + unit : ''} ${name}`;
+    }
+
+    // Parse the entire quantity string to extract the numeric value for non-range quantities
+    let totalQuantity = 0;
+
+    // Check if the entire quantity is a single Unicode fraction
+    if (unicodeFractions[quantity.trim()]) {
+      totalQuantity = unicodeFractions[quantity.trim()];
+    }
+    // Handle mixed Unicode fractions like "1½", "2¾", etc.
+    else if (/\d+[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚]/.test(quantity.trim())) {
+      const match = quantity.trim().match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])$/);
+      if (match) {
+        const wholePart = parseInt(match[1]);
+        const fractionPart = unicodeFractions[match[2]];
+        totalQuantity = wholePart + fractionPart;
+      }
+    }
+    // Handle mixed numbers like "1 1/2"
+    else if (quantity.includes(' ') && quantity.includes('/')) {
+      const parts = quantity.trim().split(' ');
+      const whole = parseInt(parts[0]);
+      const [numerator, denominator] = parts[1].split('/').map(Number);
+      totalQuantity = whole + (numerator / denominator);
+    }
+    // Handle simple fractions like "1/2"
+    else if (quantity.includes('/')) {
+      const [numerator, denominator] = quantity.split('/').map(Number);
+      totalQuantity = numerator / denominator;
+    }
+    // Handle decimal numbers
+    else {
+      const match = quantity.match(/(\d+\.?\d*)/);
+      if (match) {
+        totalQuantity = parseFloat(match[1]);
+      }
+    }
+
+    const scaled = totalQuantity * multiplier;
+
+    // Convert scaled result back to fraction format
+    const scaledQuantity = (() => {
+      const tolerance = 0.001;
+
+      // Common fractions to check - prioritize Unicode fractions for better display
+      const commonFractions = [
+        { decimal: 1/4, fraction: '¼' },
+        { decimal: 1/3, fraction: '⅓' },
+        { decimal: 1/2, fraction: '½' },
+        { decimal: 2/3, fraction: '⅔' },
+        { decimal: 3/4, fraction: '¾' },
+        { decimal: 1/8, fraction: '⅛' },
+        { decimal: 3/8, fraction: '⅜' },
+        { decimal: 5/8, fraction: '⅝' },
+        { decimal: 7/8, fraction: '⅞' },
+        { decimal: 1/6, fraction: '⅙' },
+        { decimal: 5/6, fraction: '⅚' },
+      ];
+
+      // Check if scaled value is close to a common fraction
+      const wholePart = Math.floor(scaled);
+      const fractionalPart = scaled - wholePart;
+
+      // First check if the entire scaled value (including whole part) matches a common fraction
+      for (const { decimal, fraction } of commonFractions) {
+        if (Math.abs(scaled - decimal) < tolerance) {
+          return fraction;
+        }
+      }
+
+      // Then check if just the fractional part matches
+      for (const { decimal, fraction } of commonFractions) {
+        if (Math.abs(fractionalPart - decimal) < tolerance) {
+          return wholePart > 0 ? `${wholePart} ${fraction}` : fraction;
+        }
+      }
+
+      // If no common fraction matches, try to convert to simple fraction
+      if (fractionalPart > 0) {
+        // Try to find a simple fraction representation
+        for (let denom = 2; denom <= 16; denom++) {
+          const numerator = Math.round(fractionalPart * denom);
+          if (Math.abs(fractionalPart - numerator / denom) < tolerance) {
+            const simplifiedNum = numerator;
+            const simplifiedDenom = denom;
+
+            // Reduce the fraction
+            const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+            const commonDivisor = gcd(simplifiedNum, simplifiedDenom);
+            const finalNum = simplifiedNum / commonDivisor;
+            const finalDenom = simplifiedDenom / commonDivisor;
+
+            if (finalDenom !== 1) {
+              return wholePart > 0 ? `${wholePart} ${finalNum}/${finalDenom}` : `${finalNum}/${finalDenom}`;
+            }
+          }
+        }
+      }
+
+      // For whole numbers
+      if (scaled % 1 === 0) {
+        return scaled.toString();
+      }
+
+      // If we can't convert to a nice fraction, return as decimal but only as last resort
+      return scaled.toFixed(2).replace(/\.?0+$/, '');
+    })();
 
     return `${scaledQuantity}${unit ? ' ' + unit : ''} ${name}`;
   };
@@ -72,7 +277,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
   const addToShoppingListMutation = useMutation({
     mutationFn: async () => {
       if (!recipe) return;
-      
+
       // Add each ingredient as a shopping list item
       const promises = recipe.ingredients.map(ingredient => 
         apiRequest("POST", "/api/shopping-list", {
@@ -83,7 +288,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
           recipeId: recipe.id
         })
       );
-      
+
       return Promise.all(promises);
     },
     onSuccess: () => {
@@ -177,6 +382,37 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
             </div>
           )}
 
+          {recipe.videoUrl && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Video</h3>
+              <div className="aspect-video w-full rounded-lg overflow-hidden">
+                {recipe.videoUrl.includes('youtube.com') || recipe.videoUrl.includes('youtu.be') ? (
+                  <iframe
+                    src={recipe.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                    title="Recipe video"
+                    className="w-full h-full"
+                    allowFullScreen
+                  />
+                ) : recipe.videoUrl.includes('vimeo.com') ? (
+                  <iframe
+                    src={recipe.videoUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
+                    title="Recipe video"
+                    className="w-full h-full"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    src={recipe.videoUrl}
+                    controls
+                    className="w-full h-full object-cover"
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -185,11 +421,18 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => setPortionMultiplier(0.25)}
+                    className={portionMultiplier === 0.25 ? "bg-primary text-white" : ""}
+                  >
+                    ¼x
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setPortionMultiplier(0.5)}
                     className={portionMultiplier === 0.5 ? "bg-primary text-white" : ""}
                   >
-                    <Divide className="h-4 w-4 mr-1" />
-                    1/2
+                    ½x
                   </Button>
                   <Button
                     variant="outline"
@@ -205,8 +448,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
                     onClick={() => setPortionMultiplier(2)}
                     className={portionMultiplier === 2 ? "bg-primary text-white" : ""}
                   >
-                    <X className="h-4 w-4 mr-1" />
-                    2
+                    2x
                   </Button>
                 </div>
               </div>
@@ -251,26 +493,46 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
 
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Instructions</h2>
-              <div className="space-y-4">
-                {recipe.instructions.map((instruction, index) => (
-                  <div key={index} className="flex items-start space-x-3">
-                    <span className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium flex-shrink-0 mt-1">
-                      {index + 1}
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-gray-700 leading-relaxed mb-2">
-                        {typeof instruction === 'string' ? instruction : instruction.text}
-                      </p>
-                      {typeof instruction === 'object' && instruction.imageUrl && (
-                        <img 
-                          src={instruction.imageUrl} 
-                          alt={`Step ${index + 1}`}
-                          className="rounded-lg max-w-full h-auto mt-2"
-                        />
+              <div className="space-y-6">
+                {recipe.instructions.map((section, sectionIndex) => {
+                  let stepCounter = recipe.instructions
+                    .slice(0, sectionIndex)
+                    .reduce((acc, sec) => acc + (sec.steps?.length || 0), 0);
+                  
+                  return (
+                    <div key={sectionIndex} className="space-y-4">
+                      {section.sectionName && (
+                        <h3 className="text-lg font-medium text-gray-800 border-b border-gray-200 pb-2">
+                          {section.sectionName}
+                        </h3>
                       )}
+                      <div className="space-y-4">
+                        {(section.steps || []).map((step, stepIndex) => {
+                          stepCounter++;
+                          return (
+                            <div key={stepIndex} className="flex items-start space-x-3">
+                              <span className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium flex-shrink-0 mt-1">
+                                {stepCounter}
+                              </span>
+                              <div className="flex-1">
+                                <p className="text-gray-700 leading-relaxed mb-2">
+                                  {typeof step === 'string' ? step : step.text}
+                                </p>
+                                {typeof step === 'object' && step.imageUrl && (
+                                  <img 
+                                    src={step.imageUrl} 
+                                    alt={`Step ${stepCounter}`}
+                                    className="rounded-lg max-w-full h-auto mt-2"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               {recipe.instructions.length === 0 && (
                 <p className="text-gray-500 text-sm">No instructions provided</p>
