@@ -53,7 +53,15 @@ const standardizeUnit = (unit: string): string => {
   return unitMap[unitLower] || unit;
 };
 
-const formSchema = insertRecipeSchema.omit({ instructions: true }).extend({
+const formSchema = insertRecipeSchema.omit({ instructions: true, ingredients: true }).extend({
+  ingredients: z.array(z.object({
+    sectionName: z.string().optional(),
+    items: z.array(z.object({
+      name: z.string().min(1, "Ingredient name is required"),
+      quantity: z.string().optional(),
+      unit: z.string().optional(),
+    })).min(1, "At least one ingredient is required"),
+  })).min(1, "At least one ingredient section is required"),
   instructions: z.array(z.object({
     text: z.string().min(1, "Instruction text is required"),
     imageUrl: z.string().optional(),
@@ -171,7 +179,11 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     }
   }, [recipe, open, reset, setValue]);
 
-  // Sync instructions state with form
+  // Sync ingredients and instructions state with form
+  useEffect(() => {
+    setValue("ingredients", ingredientSections);
+  }, [ingredientSections, setValue]);
+
   useEffect(() => {
     setValue("instructions", instructions);
   }, [instructions, setValue]);
