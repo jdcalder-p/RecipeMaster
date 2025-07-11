@@ -124,8 +124,8 @@ export class RecipeScraper {
     });
 
     // Clean and deduplicate ingredients completely
-    const uniqueIngredients = this.cleanAndDeduplicateIngredients(rawIngredients);
-    console.log(`🥗 FINAL UNIQUE INGREDIENTS:`, uniqueIngredients);
+    const cleanedIngredients = this.cleanAndDeduplicateIngredients(rawIngredients);
+    console.log(`🥗 FINAL UNIQUE INGREDIENTS:`, cleanedIngredients);
 
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
@@ -172,11 +172,11 @@ export class RecipeScraper {
     // Check if this is a cinnamon rolls recipe based on URL or ingredients
     const isCinnamonRollsRecipe = url.toLowerCase().includes('cinnamon') && 
                                  url.toLowerCase().includes('roll') &&
-                                 uniqueIngredients.some(ing => ing.toLowerCase().includes('bread flour') || ing.toLowerCase().includes('yeast'));
+                                 cleanedIngredients.some(ing => ing.toLowerCase().includes('bread flour') || ing.toLowerCase().includes('yeast'));
 
     if (isCinnamonRollsRecipe) {
       console.log(`🍞 Detected cinnamon rolls recipe, organizing ingredients into proper sections`);
-      
+
       // Create specific sections for cinnamon rolls
       const pasteIngredients: string[] = [];
       const rollsIngredients: string[] = [];
@@ -185,17 +185,17 @@ export class RecipeScraper {
       const unassigned: string[] = [];
 
       // Manually add the missing "3 2/3 c bread flour" if it's not in the ingredients
-      const hasBreadFlour = uniqueIngredients.some(ing => 
+      const hasBreadFlour = cleanedIngredients.some(ing => 
         ing.toLowerCase().includes('bread flour') && 
         (ing.includes('3 2/3') || ing.includes('3⅔') || /3\s*2\/3/.test(ing))
       );
-      
+
       if (!hasBreadFlour) {
         console.log(`🔧 Adding missing bread flour ingredient`);
-        uniqueIngredients.push("3 2/3 c bread flour");
+        cleanedIngredients.push("3 2/3 c bread flour");
       }
 
-      for (const ingredient of uniqueIngredients) {
+      for (const ingredient of cleanedIngredients) {
         const lowerIng = ingredient.toLowerCase();
         let assigned = false;
         console.log(`🔍 Processing ingredient: "${ingredient}"`);
@@ -209,7 +209,7 @@ export class RecipeScraper {
           assigned = true;
           console.log(`✅ Assigned to Paste: "${ingredient}"`);
         }
-        
+
         // Main rolls ingredients - check for the specific bread flour first
         else if ((lowerIng.includes('bread flour') && 
                  (lowerIng.includes('3 2/3') || lowerIng.includes('3⅔') || /3\s*2\/3/.test(lowerIng))) ||
@@ -224,7 +224,7 @@ export class RecipeScraper {
           assigned = true;
           console.log(`✅ Assigned to Rolls: "${ingredient}"`);
         }
-        
+
         // Cinnamon filling ingredients
         else if ((lowerIng.includes('brown sugar') && lowerIng.includes('packed')) ||
                  (lowerIng.includes('cinnamon') && !lowerIng.includes('roll') && lowerIng.includes('2') && lowerIng.includes('tbsp')) ||
@@ -233,7 +233,7 @@ export class RecipeScraper {
           assigned = true;
           console.log(`✅ Assigned to Cinnamon Filling: "${ingredient}"`);
         }
-        
+
         // Icing ingredients
         else if ((lowerIng.includes('butter') && (lowerIng.includes('1/3') || lowerIng.includes('⅓')) && (lowerIng.includes('c') || lowerIng.includes('cup'))) ||
                  (lowerIng.includes('cream cheese') && lowerIng.includes('softened')) ||
@@ -306,7 +306,7 @@ export class RecipeScraper {
           parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
           return parsed;
         });
-        
+
         structuredIngredients.push({
           sectionName: "Additional Ingredients",
           items: unassignedParsed
@@ -314,33 +314,33 @@ export class RecipeScraper {
         console.log(`📝 Created "Additional Ingredients" section with ${unassigned.length} ingredients:`, unassigned);
       }
 
-      
+
 
     } else {
       // Check if we have instruction sections that could indicate ingredient groupings
       if (instructions.length > 0 && instructions.some(inst => inst.sectionName)) {
         console.log(`🔧 Creating ingredient sections based on instruction sections`);
         console.log(`🔍 Available instruction sections:`, instructions.map(inst => inst.sectionName).filter(Boolean));
-        
+
         // Map instruction sections to ingredient sections
         const sectionIngredients = new Map<string, string[]>();
         const generalIngredients: string[] = [];
-        
+
         // Create ingredient sections based on the instruction sections we found
         for (const instruction of instructions) {
           if (instruction.sectionName) {
             // Extract section names from instructions for ingredient grouping
             const sectionName = instruction.sectionName;
             console.log(`🏷️ Processing section: "${sectionName}"`);
-            
+
             // Group ingredients by likely sections based on instruction section names
-            for (const ingredient of uniqueIngredients) {
+            for (const ingredient of cleanedIngredients) {
               const lowerIng = ingredient.toLowerCase();
               const lowerSection = sectionName.toLowerCase();
-              
+
               // Check if ingredient should go in this section
               let shouldAddToSection = false;
-              
+
               if (lowerSection.includes('green bean') || lowerSection.includes('prepare the green beans')) {
                 // Green beans section ingredients
                 if (lowerIng.includes('green bean') || lowerIng.includes('sundried tomato') || 
@@ -366,7 +366,7 @@ export class RecipeScraper {
                   shouldAddToSection = true;
                 }
               }
-              
+
               if (shouldAddToSection) {
                 if (!sectionIngredients.has(sectionName)) {
                   sectionIngredients.set(sectionName, []);
@@ -383,21 +383,21 @@ export class RecipeScraper {
             }
           }
         }
-        
+
         // Collect all ingredients that were assigned to sections
         const assignedIngredients = new Set<string>();
         for (const ingredients of sectionIngredients.values()) {
           ingredients.forEach(ing => assignedIngredients.add(ing.toLowerCase()));
         }
-        
+
         // Add remaining unassigned ingredients to general list
-        for (const ingredient of uniqueIngredients) {
+        for (const ingredient of cleanedIngredients) {
           if (!assignedIngredients.has(ingredient.toLowerCase())) {
             generalIngredients.push(ingredient);
             console.log(`📝 Added "${ingredient}" to general ingredients`);
           }
         }
-        
+
         // Create sections from the mapped ingredients
         for (const [sectionName, ingredients] of sectionIngredients.entries()) {
           if (ingredients.length > 0) {
@@ -412,7 +412,7 @@ export class RecipeScraper {
             console.log(`🏗️ Created section "${sectionName}" with ${ingredients.length} ingredients`);
           }
         }
-        
+
         // Add any remaining general ingredients as the first section
         if (generalIngredients.length > 0) {
           const generalParsed = generalIngredients.map((ing: string) => {
@@ -420,7 +420,7 @@ export class RecipeScraper {
             parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
             return parsed;
           });
-          
+
           // Insert at the beginning
           structuredIngredients.unshift({
             sectionName: "Main Ingredients",
@@ -428,14 +428,14 @@ export class RecipeScraper {
           });
           console.log(`🏗️ Created "Main Ingredients" section with ${generalIngredients.length} ingredients`);
         }
-        
+
       } else {
         // Fallback to single section if no instruction sections found
         console.log(`📝 No instruction sections found, creating single ingredient section`);
-        if (uniqueIngredients.length > 0) {
+        if (cleanedIngredients.length > 0) {
           structuredIngredients.push({ 
             sectionName: undefined,
-            items: uniqueIngredients.map((ing: string) => {
+            items: cleanedIngredients.map((ing: string) => {
               const parsed = this.parseIngredientText(ing);
               parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
               return parsed;
@@ -453,7 +453,7 @@ export class RecipeScraper {
         section.steps.some(step => step.text && step.text.trim().length > 15));
 
     let finalInstructions;
-    
+
     if (hasValidInstructionSections) {
       console.log(`📋 Using ${instructions.length} parsed instruction sections`);
       finalInstructions = instructions;
@@ -772,6 +772,7 @@ export class RecipeScraper {
           }
         });
 
+        ```text
         // Look for list items within content
         $content.find('ol li, ul li').each((_, el) => {
           const text = $(el).text().trim();
@@ -805,7 +806,7 @@ export class RecipeScraper {
 
     // 4. Look for instruction sections based on headings
     if (instructions.length === 0) {
-      $('h1, h2, h3, h4, h5, h6, strong, b').each((_, el) => {
+      $('h1, h2, h3, h4, h5, h5, strong, b').each((_, el) => {
         const $heading = $(el);
         const headingText = $heading.text().trim().toLowerCase();
 
@@ -1280,11 +1281,11 @@ export class RecipeScraper {
     if (!Array.isArray(instructions)) return [];
 
     console.log(`📋 Parsing ${instructions.length} instruction items`);
-    
+
     // Handle both flat array and nested object structures
     const processedInstructions = instructions.map((instruction, index) => {
       console.log(`📋 Processing instruction ${index + 1}:`, instruction['@type'] || 'unknown type');
-      
+
       if (typeof instruction === 'string') {
         return {
           sectionName: undefined,
@@ -1563,29 +1564,29 @@ export class RecipeScraper {
     // Special case for very short but valid ingredients like "1 Yolk", "Salt", "Pepper"
     const shortValidIngredients = /^\d+\s+(yolk|yolks|egg|eggs|clove|cloves|cup|cups|tbsp|tsp|oz|lb)\b/i;
     const singleWordIngredients = /^(salt|pepper|sugar|flour|butter|oil|water|milk|cream|vanilla|yeast|baking|powder|soda|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|cornstarch|flour|starch)$/i;
-    
+
     // Special case for pinch measurements and "as needed" ingredients
     const pinchIngredients = /^(pinch|dash)\s+of\s+\w+/i;
     const asNeededIngredients = /\b(as needed|to taste)\b/i;
-    
+
     if (shortValidIngredients.test(text) || singleWordIngredients.test(text) || pinchIngredients.test(text) || asNeededIngredients.test(text)) {
       return true;
     }
 
     // Check if text looks like an ingredient (contains measurements, common ingredient words)
     const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b|pinch|dash|handful)\b/i;
-    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced|white|sharp|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|cream cheese|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed|yolk|yolks|wine|port|rum|brandy|whiskey|vodka|beer|sherry|champagne|cognac|liqueur|raisins|cornstarch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|starch|arrowroot|mushrooms|mushroom|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini|enoki|maitake)\b/i;
+    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced|white|sharp|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|cream cheese|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed|yolk|yolks|wine|port|rum|brandy|whiskey|vodka|beer|sherry|champagne|cognac|liqueur|raisins|cornstarch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|cornstarch|flour|starch|arrowroot|mushrooms|mushroom|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini|enoki|maitake)\b/i;
 
     // Special case for numbered items that look like ingredients (e.g., "4 large russet potatoes")
     const numberedIngredientPattern = /^\d+\s+(large|medium|small|whole|fresh|dried|sliced|chopped|minced)?\s*(russet|yukon|red|white|sweet|ruby|golden|dark|light|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini)?\s*(potato|potatoes|onion|onions|carrot|carrots|apple|apples|egg|eggs|yolk|yolks|clove|cloves|cup|cups|tbsp|tsp|oz|lb|pound|pounds|wine|port|rum|brandy|raisins|nutmeg|cinnamon|cornstarch|starch|mushrooms|mushroom)\b/i;
 
     // Special case for cheese types that might be mentioned in instructions
     const cheesePattern = /\b(cheddar|cheese|goat|parmesan|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed)\b/i;
-    
+
     // Special case for alcohol and cooking ingredients
     const alcoholPattern = /\b(wine|port|rum|brandy|whiskey|vodka|beer|sherry|champagne|cognac|liqueur|cooking wine|ruby port|white wine|red wine)\b/i;
     const cookingPattern = /\b(cornstarch|arrowroot|flour|starch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|raisins|dried fruit)\b/i;
-    
+
     // Special case for mushroom varieties (including specialty types)
     const mushroomPattern = /\b(mushrooms?|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini|enoki|maitake|king oyster|lions mane|hen of the woods)\b/i;
 
