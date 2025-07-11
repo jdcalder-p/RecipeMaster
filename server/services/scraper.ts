@@ -684,6 +684,31 @@ export class RecipeScraper {
       items: Array<{ name: string; quantity?: string; unit?: string; }>;
     }> = [];
 
+    // Try to extract ingredients from specific WP Recipe Maker selectors first
+    const wprmIngredients = $('.wprm-recipe-ingredient, .wprm-recipe-ingredient-name');
+    if (wprmIngredients.length > 0) {
+      const ingredients: Array<{ name: string; quantity?: string; unit?: string; }> = [];
+      
+      wprmIngredients.each((_, element) => {
+        const $element = $(element);
+        const text = $element.text().trim();
+        
+        if (text && this.looksLikeIngredient(text)) {
+          const parsed = this.parseIngredientText(text);
+          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+          ingredients.push(parsed);
+        }
+      });
+      
+      if (ingredients.length > 0) {
+        sections.push({
+          sectionName: undefined,
+          items: ingredients
+        });
+        return sections;
+      }
+    }
+
     // Try to find sections with headings followed by ingredient lists
     const possibleSections = [
       'h2, h3, h4, h5, h6, .recipe-section-title, .ingredient-section, .section-title, strong, b, .wp-block-heading, .has-text-align-center, .ingredient-header',
@@ -693,6 +718,11 @@ export class RecipeScraper {
       $(sectionSelector).each((_, element) => {
         const $section = $(element);
         const sectionTitle = $section.text().trim();
+
+        // Skip sections that are clearly not ingredients (FAQ, about, etc.)
+        if (/FAQ|about|what|why|how|can i|tips|notes|storage|nutrition|copyright|recipe card|print|comment|share|follow|social|contact|privacy|terms|related|similar|more recipes|other recipes|you might also like|recommended|popular|trending|recent|newsletter|subscribe|join|sign up|login|register|account|profile|settings|search|category|tag|archive|blog|home|menu|navigation|footer|header|sidebar|advertisement|ad|sponsored|affiliate|disclaimer|disclosure|legal|policy|cookie|gdpr|ccpa|california|europe|eu|\\d+\\.\\s*(what|how|why|can|do|does|is|are|will|would|should|could|might|may)/i.test(sectionTitle)) {
+          return;
+        }
 
         // Look for ingredient patterns in the section title - expanded list
         const isIngredientSection = /ingredient|paste|dough|filling|icing|frosting|topping|sauce|marinade|coating|batter|roll|cinnamon|for the|glaze|syrup|mixture|base|cream|cheese/i.test(sectionTitle);
@@ -710,17 +740,15 @@ export class RecipeScraper {
             if (nextElement.is('ul, ol')) {
               nextElement.find('li').each((_, li) => {
                 const text = $(li).text().trim();
-                if (text && this.looksLikeIngredient(text)) {
+                if (text && this.looksLikeIngredient(text) && text.length < 200) {
                   const parsed = this.parseIngredientText(text);
-                  // Capitalize the first letter of ingredient name
                   parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
                   ingredients.push(parsed);
                 }
               });
               break;
-            } else if (nextElement.is('div, p') && this.looksLikeIngredient(nextElement.text().trim())) {
+            } else if (nextElement.is('div, p') && this.looksLikeIngredient(nextElement.text().trim()) && nextElement.text().trim().length < 200) {
               const parsed = this.parseIngredientText(nextElement.text().trim());
-              // Capitalize the first letter of ingredient name
               parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
               ingredients.push(parsed);
             }
