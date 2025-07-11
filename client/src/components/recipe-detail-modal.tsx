@@ -493,20 +493,20 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
 
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Instructions</h2>
-              <div className="space-y-6">
+              <div className="space-y-3">
                 {recipe.instructions.map((section, sectionIndex) => {
                   let stepCounter = recipe.instructions
                     .slice(0, sectionIndex)
                     .reduce((acc, sec) => acc + (sec.steps?.length || 0), 0);
 
                   return (
-                    <div key={sectionIndex} className="space-y-4">
+                    <div key={sectionIndex} className="space-y-3">
                       {section.sectionName && (
-                        <h3 className="text-lg font-medium text-gray-800 border-b border-gray-200 pb-2">
+                        <h3 className="text-lg font-medium text-gray-800 border-b border-gray-200 pb-2 mt-4 first:mt-0">
                           {section.sectionName}
                         </h3>
                       )}
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {(section.steps || []).map((step, stepIndex) => {
                           stepCounter++;
                           return (
@@ -515,10 +515,10 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
                                 {stepCounter}
                               </span>
                               <div className="flex-1">
-                                <p className="text-gray-700 leading-relaxed mb-2">
+                                <p className="text-gray-700 leading-relaxed">
                                   {typeof step === 'string' ? step : step.text}
                                 </p>
-                                {typeof step === 'object' && step.imageUrl && (
+                                {typeof step === 'object' && step.imageUrl && step.imageUrl !== 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%20300%20169\'%3E%3C/svg%3E' && (
                                   <img 
                                     src={step.imageUrl} 
                                     alt={`Step ${stepCounter}`}
