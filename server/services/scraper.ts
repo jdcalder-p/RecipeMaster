@@ -1177,6 +1177,34 @@ export class RecipeScraper {
     return hasImageExtension || imagePatterns.test(src);
   }
 
+  private static isValidRecipeImage(src: string, alt: string = ''): boolean {
+    if (!src) return false;
+    
+    // Filter out obvious non-recipe images
+    if (src.includes('data:image/gif') ||
+        src.includes('data:image/svg+xml') || 
+        src.includes('placeholder') ||
+        src.includes('logo') ||
+        src.includes('icon') ||
+        src.includes('avatar') ||
+        src.includes('spacer') ||
+        src.includes('blank')) {
+      return false;
+    }
+    
+    // Check for valid image formats
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|avif)(\?|$)/i;
+    const hasImageExtension = imageExtensions.test(src);
+    
+    // Allow if it has image extension or contains image-like patterns
+    const imagePatterns = /\.(jpg|jpeg|png|gif|webp|avif)|image|photo|picture|wp-content|recipe|food|dish/i;
+    
+    // Check alt text for recipe-related content
+    const altIsRecipeRelated = alt && /recipe|food|dish|cooking|ingredient|step|instruction/i.test(alt);
+    
+    return hasImageExtension || imagePatterns.test(src) || altIsRecipeRelated;
+  }
+
   private static looksLikeIngredient(text: string): boolean {
     // Exclude FAQ content and other non-ingredient text
     const excludePatterns = [
