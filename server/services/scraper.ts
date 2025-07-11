@@ -1185,7 +1185,7 @@ export class RecipeScraper {
   }
 
   private static removeDuplicateIngredients(ingredients: string[]): string[] {
-    const seen = new Set<string>();
+    const seen = new Map<string, string>(); // normalized -> original
     const uniqueIngredients: string[] = [];
 
     for (const ingredient of ingredients) {
@@ -1196,25 +1196,57 @@ export class RecipeScraper {
         continue;
       }
 
-      // Check for similar ingredients (e.g., "4 large russet potatoes" vs "russet potatoes")
-      const isDuplicate = Array.from(seen).some(seenIngredient => {
-        const ingredientWords = normalizedIngredient.split(/\s+/);
-        const seenWords = seenIngredient.split(/\s+/);
+      // Check for similar ingredients by comparing core ingredient names
+      let isDuplicate = false;
+      
+      for (const [seenNormalized, seenOriginal] of seen.entries()) {
+        // Extract the main ingredient name by removing quantities and common descriptors
+        const currentCore = this.extractCoreIngredientName(normalizedIngredient);
+        const seenCore = this.extractCoreIngredientName(seenNormalized);
         
-        // If one ingredient is a subset of another, consider it a duplicate
-        const isSubset = ingredientWords.every(word => seenWords.includes(word)) ||
-                        seenWords.every(word => ingredientWords.includes(word));
-        
-        return isSubset;
-      });
+        // If core names match, it's a duplicate
+        if (currentCore === seenCore && currentCore.length > 0) {
+          isDuplicate = true;
+          // Keep the more detailed version (usually the one with quantity)
+          if (ingredient.length > seenOriginal.length) {
+            // Replace with more detailed version
+            const seenIndex = uniqueIngredients.indexOf(seenOriginal);
+            if (seenIndex !== -1) {
+              uniqueIngredients[seenIndex] = ingredient;
+              seen.delete(seenNormalized);
+              seen.set(normalizedIngredient, ingredient);
+            }
+          }
+          break;
+        }
+      }
 
       if (!isDuplicate) {
-        seen.add(normalizedIngredient);
+        seen.set(normalizedIngredient, ingredient);
         uniqueIngredients.push(ingredient);
       }
     }
 
     return uniqueIngredients;
+  }
+
+  private static extractCoreIngredientName(ingredient: string): string {
+    // Remove quantities, measurements, and common descriptors
+    let core = ingredient
+      .replace(/^\d+(\s*\/\s*\d+)?\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\s*/i, '')
+      .replace(/^(large|medium|small|whole|fresh|dried|ground|chopped|minced|sliced|diced|grated|shredded|crumbled|softened|melted|packed|optional)\s+/gi, '')
+      .replace(/\s*,\s*(shredded|grated|crumbled|chopped|minced|sliced|diced|optional).*$/i, '')
+      .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical content
+      .trim();
+    
+    // Extract the main noun (last significant word, excluding descriptors)
+    const words = core.split(/\s+/);
+    if (words.length > 0) {
+      // Return the core ingredient name
+      return words[words.length - 1];
+    }
+    
+    return core;
   }
 
   private static extractMissingIngredientsFromInstructions(instructionText: string, existingIngredients: string[]): string[] {
