@@ -108,6 +108,106 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
         return parseFloat(part);
       };
 
+      const scaledStart = parseQuantityPart(rangeMatch[1]) * multiplier;
+      const scaledEnd = parseQuantityPart(rangeMatch[2]) * multiplier;
+      
+      return `${formatNumber(scaledStart)} to ${formatNumber(scaledEnd)}${unit ? ` ${unit}` : ''} ${name}`;
+    }
+
+    // Helper function to parse mixed fractions like "1 ¼"
+    const parseMixedFraction = (qty: string): number => {
+      // Handle mixed fractions like "1 ¼" or "1¼"
+      const mixedMatch = qty.match(/^(\d+)\s*([¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])$/);
+      if (mixedMatch) {
+        const wholeNumber = parseInt(mixedMatch[1]);
+        const fraction = unicodeFractions[mixedMatch[2]];
+        return wholeNumber + fraction;
+      }
+
+      // Handle space-separated mixed fractions like "1 1/4"
+      const spaceMixedMatch = qty.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+      if (spaceMixedMatch) {
+        const wholeNumber = parseInt(spaceMixedMatch[1]);
+        const numerator = parseInt(spaceMixedMatch[2]);
+        const denominator = parseInt(spaceMixedMatch[3]);
+        return wholeNumber + (numerator / denominator);
+      }
+
+      // Handle simple fractions like "1/2"
+      if (qty.includes('/')) {
+        const [num, denom] = qty.split('/').map(Number);
+        return num / denom;
+      }
+
+      // Handle unicode fractions
+      if (unicodeFractions[qty]) {
+        return unicodeFractions[qty];
+      }
+
+      // Handle regular numbers
+      return parseFloat(qty);
+    };
+
+    // Helper function to format numbers back to fractions when appropriate
+    const formatNumber = (num: number): string => {
+      // Handle very small numbers (round to 0)
+      if (num < 0.01) return '0';
+      
+      // Convert common decimal values back to fractions
+      const fractionMap: { [key: string]: string } = {
+        '0.125': '⅛',
+        '0.25': '¼',
+        '0.33': '⅓',
+        '0.333': '⅓',
+        '0.375': '⅜',
+        '0.5': '½',
+        '0.625': '⅝',
+        '0.66': '⅔',
+        '0.667': '⅔',
+        '0.75': '¾',
+        '0.875': '⅞'
+      };
+
+      const rounded = Math.round(num * 1000) / 1000;
+      const decimalPart = rounded % 1;
+      const wholePart = Math.floor(rounded);
+      
+      // Check if the decimal part matches a known fraction
+      const decimalKey = decimalPart.toFixed(3);
+      if (fractionMap[decimalKey]) {
+        return wholePart > 0 ? `${wholePart}${fractionMap[decimalKey]}` : fractionMap[decimalKey];
+      }
+
+      // Check for other common fractions
+      if (Math.abs(decimalPart - 1/3) < 0.01) {
+        return wholePart > 0 ? `${wholePart}⅓` : '⅓';
+      }
+      if (Math.abs(decimalPart - 2/3) < 0.01) {
+        return wholePart > 0 ? `${wholePart}⅔` : '⅔';
+      }
+      if (Math.abs(decimalPart - 1/8) < 0.01) {
+        return wholePart > 0 ? `${wholePart}⅛` : '⅛';
+      }
+      if (Math.abs(decimalPart - 5/8) < 0.01) {
+        return wholePart > 0 ? `${wholePart}⅝` : '⅝';
+      }
+
+      // If no exact fraction match, show as decimal but round to reasonable precision
+      if (decimalPart < 0.01) {
+        return wholePart.toString();
+      }
+      
+      return rounded.toString();
+    };
+
+    // Parse the quantity
+    const numericValue = parseMixedFraction(quantity.trim());
+    const scaledValue = numericValue * multiplier;
+    const formattedValue = formatNumber(scaledValue);
+
+    return `${formattedValue}${unit ? ` ${unit}` : ''} ${name}`rt);
+      };
+
       const firstValue = parseQuantityPart(rangeMatch[1]);
       const secondValue = parseQuantityPart(rangeMatch[2]);
 
