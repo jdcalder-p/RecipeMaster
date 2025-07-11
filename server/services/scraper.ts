@@ -1192,15 +1192,29 @@ export class RecipeScraper {
       return false;
     }
     
+    // Filter out advertisement and product images
+    const advertisementPatterns = /knife|knives|knife-set|steak-knife|utensil|tool|cookware|equipment|product|advertisement|ad-|promo|affiliate|sponsor|buy|shop|sale|deal|offer|discount|price/i;
+    if (advertisementPatterns.test(src) || (alt && advertisementPatterns.test(alt))) {
+      console.log(`🚫 Filtered out advertisement image: ${src}`);
+      return false;
+    }
+    
+    // Filter out Chef Jean Pierre product promotions specifically
+    if (src.includes('Chef-Jean-Pierre') && (src.includes('Knife') || src.includes('Set') || src.includes('Piece'))) {
+      console.log(`🚫 Filtered out Chef Jean Pierre product image: ${src}`);
+      return false;
+    }
+    
     // Check for valid image formats
     const imageExtensions = /\.(jpg|jpeg|png|gif|webp|avif)(\?|$)/i;
     const hasImageExtension = imageExtensions.test(src);
     
-    // Allow if it has image extension or contains image-like patterns
+    // Allow if it has image extension or contains image-like patterns (but not advertisements)
     const imagePatterns = /\.(jpg|jpeg|png|gif|webp|avif)|image|photo|picture|wp-content|recipe|food|dish/i;
     
-    // Check alt text for recipe-related content
-    const altIsRecipeRelated = alt && /recipe|food|dish|cooking|ingredient|step|instruction/i.test(alt);
+    // Check alt text for recipe-related content (but not advertisement content)
+    const altIsRecipeRelated = alt && /recipe|food|dish|cooking|ingredient|step|instruction/i.test(alt) && 
+                              !advertisementPatterns.test(alt);
     
     return hasImageExtension || imagePatterns.test(src) || altIsRecipeRelated;
   }
