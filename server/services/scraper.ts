@@ -123,23 +123,13 @@ export class RecipeScraper {
       return ing;
     });
 
-    // Clean and deduplicate ingredients with improved logic
+    // Clean and deduplicate ingredients completely
     const uniqueIngredients = this.cleanAndDeduplicateIngredients(rawIngredients);
+    console.log(`🥗 FINAL UNIQUE INGREDIENTS:`, uniqueIngredients);
 
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
     console.log(`📋 JSON-LD INSTRUCTIONS PARSED:`, instructions);
-
-    // Extract any missing ingredients mentioned in instructions
-    const instructionText = instructions.map(section => 
-      section.steps.map(step => step.text).join(' ')
-    ).join(' ');
-    
-    const missingIngredients = this.extractMissingIngredientsFromInstructions(instructionText, uniqueIngredients);
-    if (missingIngredients.length > 0) {
-      console.log(`Found ${missingIngredients.length} missing ingredients in instructions:`, missingIngredients);
-      uniqueIngredients.push(...missingIngredients);
-    }
 
     // If JSON-LD instructions are incomplete, try manual extraction
     if (instructions.length === 0 || (instructions.length === 1 && instructions[0].steps.length === 1)) {
@@ -173,14 +163,14 @@ export class RecipeScraper {
       }
     }
 
-    // Check if this is a cinnamon rolls recipe and override with structured sections if needed
-    let structuredIngredients: Array<{
+    // Create final structured ingredients from unique list only
+    const structuredIngredients: Array<{
       sectionName?: string;
       items: Array<{ name: string; quantity?: string; unit?: string; }>;
-    }> = uniqueIngredients.filter(Boolean).length > 0 
+    }> = uniqueIngredients.length > 0 
       ? [{ 
           sectionName: undefined,
-          items: uniqueIngredients.filter(Boolean).map((ing: any) => {
+          items: uniqueIngredients.map((ing: string) => {
             const parsed = this.parseIngredientText(ing);
             // Capitalize the first letter of ingredient name
             parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
@@ -189,51 +179,7 @@ export class RecipeScraper {
         }]
       : [];
 
-    // If this is a cinnamon rolls recipe, try to use the structured sections
-    if (/cinnamon.*roll/i.test(url) || /cinnamon.*roll/i.test(recipe.name || '')) {
-      console.log("Detected cinnamon rolls recipe in JSON-LD, using structured sections");
-      structuredIngredients = [
-        {
-          sectionName: "Paste",
-          items: [
-            { name: "2% or whole milk", quantity: "1/3", unit: "Cup" },
-            { name: "Hot tap water", quantity: "1/2", unit: "Cup" },
-            { name: "Bread flour", quantity: "1/3", unit: "Cup" }
-          ]
-        },
-        {
-          sectionName: "Rolls", 
-          items: [
-            { name: "Prepared paste" },
-            { name: "Instant yeast", quantity: "3", unit: "tsp" },
-            { name: "2% or whole milk warmed to 100-110 degrees", quantity: "2/3", unit: "Cup" },
-            { name: "Sugar", quantity: "1/2", unit: "Cup" },
-            { name: "Kerrygold salted butter melted", quantity: "3", unit: "Tbsp" },
-            { name: "Egg", quantity: "1" },
-            { name: "Salt", quantity: "1", unit: "tsp" },
-            { name: "Bread flour", quantity: "3 2/3", unit: "Cup" },
-            { name: "Heavy whipping cream", quantity: "1/2", unit: "Cup" }
-          ]
-        },
-        {
-          sectionName: "Cinnamon Filling",
-          items: [
-            { name: "Light brown sugar packed", quantity: "1", unit: "Cup" },
-            { name: "Cinnamon", quantity: "2", unit: "Tbsp" },
-            { name: "Kerrygold salted butter softened", quantity: "8", unit: "Tbsp" }
-          ]
-        },
-        {
-          sectionName: "Icing",
-          items: [
-            { name: "Kerrygold salted butter softened", quantity: "1/3", unit: "Cup" },
-            { name: "Cream cheese softened", quantity: "6", unit: "Tbsp" },
-            { name: "Powdered sugar", quantity: "2", unit: "Cup" },
-            { name: "Vanilla", quantity: "1/2", unit: "Tbsp" }
-          ]
-        }
-      ];
-    }
+    
 
     // If instructions are empty or only contain section headers, create a fallback
     const processedInstructions = instructions.filter(Boolean);
@@ -441,22 +387,31 @@ export class RecipeScraper {
       ? [{ steps: instructionsWithImages }]
       : [{ steps: [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }] }];
 
-    // Clean up ingredients
+    // Clean up ingredients and ensure no duplicates
     const cleanedIngredients = ingredients.filter(Boolean).length > 0 
       ? this.cleanAndDeduplicateIngredients(ingredients.filter(Boolean))
       : [];
 
+    // Only use the best available ingredients source (no mixing that causes duplicates)
+    let finalIngredients: Array<{
+      sectionName?: string;
+      items: Array<{ name: string; quantity?: string; unit?: string; }>;
+    }> = [];
+
+    if (ingredientsWithSections.length > 0) {
+      finalIngredients = ingredientsWithSections;
+    } else if (cleanedIngredients.length > 0) {
+      finalIngredients = [{ items: cleanedIngredients.map((ing: string) => {
+        const parsed = this.parseIngredientText(ing);
+        parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+        return parsed;
+      }) }];
+    }
+
     return {
       title,
       description,
-      ingredients: ingredientsWithSections.length > 0 ? ingredientsWithSections : cleanedIngredients.length > 0 
-        ? [{ items: cleanedIngredients.map((ing: string) => {
-              const parsed = this.parseIngredientText(ing);
-              // Capitalize the first letter of ingredient name
-              parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-              return parsed;
-            }) }]
-          : [],
+      ingredients: finalIngredients,
       instructions: instructionSections,
       cookTime,
       servings,
