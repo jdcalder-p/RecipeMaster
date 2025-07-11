@@ -695,7 +695,9 @@ export class RecipeScraper {
         if (images.length > index) {
           const img = images.eq(index);
           const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
-          if (src && !src.includes('data:image/svg+xml') && !src.includes('placeholder')) {
+          const alt = img.attr('alt') || '';
+          
+          if (src && this.isValidRecipeImage(src, alt)) {
             imageUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
             console.log(`Found image for step ${stepNumber}: ${imageUrl}`);
             break;
@@ -709,7 +711,9 @@ export class RecipeScraper {
         if (allImages.length > index) {
           const img = allImages.eq(index);
           const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
-          if (src && !src.includes('data:image/svg+xml') && !src.includes('placeholder')) {
+          const alt = img.attr('alt') || '';
+          
+          if (src && this.isValidRecipeImage(src, alt)) {
             imageUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
             console.log(`Found fallback image for step ${stepNumber}: ${imageUrl}`);
           }
@@ -1073,7 +1077,9 @@ export class RecipeScraper {
       const img = $(selector).first();
       if (img.length) {
         const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || img.attr('data-original');
-        if (src && !src.includes('data:image/svg+xml') && !src.includes('placeholder')) {
+        const alt = img.attr('alt') || '';
+        
+        if (src && this.isValidRecipeImage(src, alt)) {
           return src.startsWith('http') ? src : new URL(src, baseUrl).href;
         }
       }
@@ -1086,17 +1092,175 @@ export class RecipeScraper {
       const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || img.attr('data-original');
       const alt = img.attr('alt') || '';
       
-      if (src && 
-          !src.includes('data:image/svg+xml') && 
-          !src.includes('placeholder') &&
-          !src.includes('logo') &&
-          !src.includes('icon') &&
-          (src.includes('recipe') || src.includes('food') || alt.toLowerCase().includes('recipe') || alt.toLowerCase().includes('food'))) {
+      if (src && this.isValidRecipeImage(src, alt)) {
         return src.startsWith('http') ? src : new URL(src, baseUrl).href;
       }
     }
     
     return '';
+  }
+
+  private static isValidRecipeImage(src: string, alt: string): boolean {
+    // Filter out invalid image types
+    if (!src || 
+        src.includes('data:image/svg+xml') || 
+        src.includes('placeholder')) {
+      return false;
+    }
+
+    // Filter out common non-recipe images by URL patterns
+    const excludePatterns = [
+      /logo/i,
+      /icon/i,
+      /avatar/i,
+      /profile/i,
+      /banner/i,
+      /header/i,
+      /footer/i,
+      /advertisement/i,
+      /ad[-_]/i,
+      /social/i,
+      /facebook/i,
+      /twitter/i,
+      /instagram/i,
+      /pinterest/i,
+      /youtube/i,
+      /knife/i,
+      /set/i,
+      /product/i,
+      /tool/i,
+      /equipment/i,
+      /utensil/i,
+      /cookware/i,
+      /kitchenware/i,
+      /promotion/i,
+      /sale/i,
+      /discount/i,
+      /affiliate/i,
+      /sponsor/i,
+      /author/i,
+      /chef.*photo/i,
+      /headshot/i,
+      /portrait/i,
+      /bio/i,
+      /about/i,
+      /contact/i,
+      /newsletter/i,
+      /subscribe/i,
+      /email/i,
+      /book/i,
+      /ebook/i,
+      /course/i,
+      /class/i,
+      /button/i,
+      /arrow/i,
+      /play/i,
+      /video.*thumb/i,
+      /thumbnail/i,
+      /widget/i,
+      /sidebar/i,
+      /related/i,
+      /popular/i,
+      /trending/i,
+      /recent/i,
+      /featured(?!.*recipe)/i, // Featured but not featured recipe
+      /badge/i,
+      /award/i,
+      /rating/i,
+      /star/i,
+      /review/i,
+      /comment/i,
+      /share/i,
+      /print/i,
+      /download/i,
+      /pdf/i,
+      /calendar/i,
+      /clock/i,
+      /timer/i,
+      /serving/i,
+      /difficulty/i,
+      /prep.*time/i,
+      /cook.*time/i,
+      /background/i,
+      /texture/i,
+      /pattern/i,
+      /watermark/i
+    ];
+
+    // Check if URL matches any exclude pattern
+    for (const pattern of excludePatterns) {
+      if (pattern.test(src)) {
+        console.log(`Filtered out image URL: ${src} (matched pattern: ${pattern})`);
+        return false;
+      }
+    }
+
+    // Filter out by alt text patterns
+    const altExcludePatterns = [
+      /knife/i,
+      /set/i,
+      /product/i,
+      /tool/i,
+      /equipment/i,
+      /utensil/i,
+      /cookware/i,
+      /chef.*photo/i,
+      /author/i,
+      /logo/i,
+      /icon/i,
+      /advertisement/i,
+      /promotion/i,
+      /affiliate/i,
+      /book/i,
+      /course/i,
+      /subscribe/i,
+      /newsletter/i
+    ];
+
+    for (const pattern of altExcludePatterns) {
+      if (pattern.test(alt)) {
+        console.log(`Filtered out image by alt text: ${alt} (matched pattern: ${pattern})`);
+        return false;
+      }
+    }
+
+    // Prefer images with food/recipe-related indicators
+    const positiveIndicators = [
+      /recipe/i,
+      /food/i,
+      /dish/i,
+      /meal/i,
+      /cooking/i,
+      /baked?/i,
+      /cooked/i,
+      /prepared/i,
+      /finished/i,
+      /final/i,
+      /served/i,
+      /plate/i,
+      /bowl/i,
+      /kitchen/i,
+      /ingredient/i,
+      /potato/i,
+      /cheese/i,
+      /bacon/i,
+      /casserole/i,
+      /romanoff/i
+    ];
+
+    // Check if URL or alt has positive indicators
+    const hasPositiveIndicator = positiveIndicators.some(pattern => 
+      pattern.test(src) || pattern.test(alt)
+    );
+
+    // If it has positive indicators, it's likely a recipe image
+    if (hasPositiveIndicator) {
+      return true;
+    }
+
+    // If no positive indicators but also no negative patterns, allow if it's a reasonable size
+    // (This helps catch recipe images that don't have obvious naming)
+    return true;
   }
 
   private static looksLikeIngredient(text: string): boolean {
