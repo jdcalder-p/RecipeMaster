@@ -52,13 +52,19 @@ export class FirebaseStorage implements IStorage {
     try {
       const snapshot = await db.collection(COLLECTIONS.RECIPES)
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
         .get();
 
-      return snapshot.docs.map(doc => ({
+      // Sort by createdAt on the client side instead
+      const recipes = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Recipe[];
+
+      return recipes.sort((a, b) => {
+        const aDate = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+        const bDate = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+        return bDate.getTime() - aDate.getTime();
+      });
     } catch (error) {
       console.error('Error getting recipes:', error);
       return [];
@@ -149,7 +155,6 @@ export class FirebaseStorage implements IStorage {
       // This is a simple implementation - for production, consider using Algolia or similar
       const snapshot = await db.collection(COLLECTIONS.RECIPES)
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
         .get();
 
       const recipes = snapshot.docs.map(doc => ({
@@ -157,10 +162,16 @@ export class FirebaseStorage implements IStorage {
         ...doc.data()
       })) as Recipe[];
 
-      // Filter results on the client side
-      return recipes.filter(recipe => 
+      // Filter and sort results on the client side
+      const filteredRecipes = recipes.filter(recipe => 
         recipe.title.toLowerCase().includes(query.toLowerCase())
       );
+
+      return filteredRecipes.sort((a, b) => {
+        const aDate = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+        const bDate = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+        return bDate.getTime() - aDate.getTime();
+      });
     } catch (error) {
       console.error('Error searching recipes:', error);
       return [];
