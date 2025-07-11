@@ -305,42 +305,7 @@ export class RecipeScraper {
         console.log(`📝 Added ${unassigned.length} unassigned ingredients`);
       }
 
-      // Special check: if "3 2/3 c bread flour" is mentioned in instructions but missing from ingredients
-      const hasMainBreadFlour = structuredIngredients.some(section => 
-        section.items.some(item => 
-          item.name.toLowerCase().includes('bread flour') && 
-          (item.quantity?.includes('3') && item.quantity?.includes('2/3'))
-        )
-      );
-
-      if (!hasMainBreadFlour) {
-        console.log(`🔍 Main bread flour ingredient missing, checking instructions...`);
-        const instructionText = instructions.map(inst => 
-          inst.steps.map(step => step.text).join(' ')
-        ).join(' ');
-
-        if (instructionText.includes('3 2/3 c bread flour')) {
-          console.log(`✅ Found missing bread flour in instructions, adding to rolls section`);
-          // Find the rolls section and add the missing ingredient
-          const rollsSection = structuredIngredients.find(section => 
-            section.sectionName?.toLowerCase().includes('roll')
-          );
-          if (rollsSection) {
-            rollsSection.items.push({
-              name: "Bread flour",
-              quantity: "3 2/3",
-              unit: "c"
-            });
-          } else if (structuredIngredients.length > 0) {
-            // Add to first section if no rolls section found
-            structuredIngredients[0].items.push({
-              name: "Bread flour", 
-              quantity: "3 2/3",
-              unit: "c"
-            });
-          }
-        }
-      }
+      
 
     } else {
       // Check if we have instruction sections that could indicate ingredient groupings
