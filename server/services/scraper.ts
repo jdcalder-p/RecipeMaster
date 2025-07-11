@@ -128,9 +128,23 @@ export class RecipeScraper {
       return ing;
     });
 
+    // Remove duplicates based on ingredient name similarity
+    const uniqueIngredients = this.removeDuplicateIngredients(ingredients);
+
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
     console.log(`📋 JSON-LD INSTRUCTIONS PARSED:`, instructions);
+
+    // Extract any missing ingredients mentioned in instructions
+    const instructionText = instructions.map(section => 
+      section.steps.map(step => step.text).join(' ')
+    ).join(' ');
+    
+    const missingIngredients = this.extractMissingIngredientsFromInstructions(instructionText, uniqueIngredients);
+    if (missingIngredients.length > 0) {
+      console.log(`Found ${missingIngredients.length} missing ingredients in instructions:`, missingIngredients);
+      uniqueIngredients.push(...missingIngredients);
+    }
 
     // If JSON-LD instructions are incomplete, try manual extraction
     if (instructions.length === 0 || (instructions.length === 1 && instructions[0].steps.length === 1)) {
@@ -168,10 +182,10 @@ export class RecipeScraper {
     let structuredIngredients: Array<{
       sectionName?: string;
       items: Array<{ name: string; quantity?: string; unit?: string; }>;
-    }> = ingredients.filter(Boolean).length > 0 
+    }> = uniqueIngredients.filter(Boolean).length > 0 
       ? [{ 
           sectionName: undefined,
-          items: ingredients.filter(Boolean).map((ing: any) => {
+          items: uniqueIngredients.filter(Boolean).map((ing: any) => {
             const parsed = this.parseIngredientText(ing);
             // Capitalize the first letter of ingredient name
             parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
@@ -1057,10 +1071,9 @@ export class RecipeScraper {
       /\b(what|why|how|can i|should i|will|would|could|might|may|do|does|is|are|about|tips|note|storage|nutrition|FAQ|frequently|asked|question|answer|copyright|recipe card|print|comment|share|follow|social|contact|privacy|terms|related|similar|more recipes|other recipes|you might also like|recommended|popular|trending|recent|newsletter|subscribe|join|sign up|login|register|account|profile|settings|search|category|tag|archive|blog|home|menu|navigation|footer|header|sidebar|advertisement|ad|sponsored|affiliate|disclaimer|disclosure|legal|policy|cookie|gdpr|ccpa|california|europe|eu)\b/i,
       /\?\s*$/, // Ends with question mark
       /\b(adding|substitute|replace|instead|alternative|option|variation|different|best|type|kind|brand|store|buy|purchase|find|where|when|traditional|regular|mix|combination|profile|enhance|flavor|mellow|blend|beautifully)\b/i,
-      /\b(sharp|white|cheddar|cheese|traditionally|used|because|adds|tangy|creamy|even|also|can|be|for|a|different|flavor|profile)\b.*\b(sharp|white|cheddar|cheese|traditionally|used|because|adds|tangy|creamy|even|also|can|be|for|a|different|flavor|profile)\b/i,
     ];
 
-    // Check if text matches any exclude pattern - but exclude the potato-specific pattern
+    // Check if text matches any exclude pattern
     for (const pattern of excludePatterns) {
       if (pattern.test(text)) {
         return false;
@@ -1074,12 +1087,15 @@ export class RecipeScraper {
 
     // Check if text looks like an ingredient (contains measurements, common ingredient words)
     const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b)\b/i;
-    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced)\b/i;
+    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced|white|sharp|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|cream cheese|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed)\b/i;
     
     // Special case for numbered items that look like ingredients (e.g., "4 large russet potatoes")
     const numberedIngredientPattern = /^\d+\s+(large|medium|small|whole|fresh|dried)?\s*(russet|yukon|red|white|sweet)?\s*(potato|potatoes|onion|onions|carrot|carrots|apple|apples|egg|eggs|clove|cloves|cup|cups|tbsp|tsp|oz|lb|pound|pounds)\b/i;
 
-    return measurementPattern.test(text) || ingredientWords.test(text) || numberedIngredientPattern.test(text);
+    // Special case for cheese types that might be mentioned in instructions
+    const cheesePattern = /\b(cheddar|cheese|goat|parmesan|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed)\b/i;
+
+    return measurementPattern.test(text) || ingredientWords.test(text) || numberedIngredientPattern.test(text) || cheesePattern.test(text);
   }
 
   private static extractBySelectors($: cheerio.CheerioAPI, selectors: string[]): string {
@@ -1168,6 +1184,72 @@ export class RecipeScraper {
     return [];
   }
 
+  private static removeDuplicateIngredients(ingredients: string[]): string[] {
+    const seen = new Set<string>();
+    const uniqueIngredients: string[] = [];
+
+    for (const ingredient of ingredients) {
+      const normalizedIngredient = ingredient.toLowerCase().trim();
+      
+      // Skip if we've already seen this exact ingredient
+      if (seen.has(normalizedIngredient)) {
+        continue;
+      }
+
+      // Check for similar ingredients (e.g., "4 large russet potatoes" vs "russet potatoes")
+      const isDuplicate = Array.from(seen).some(seenIngredient => {
+        const ingredientWords = normalizedIngredient.split(/\s+/);
+        const seenWords = seenIngredient.split(/\s+/);
+        
+        // If one ingredient is a subset of another, consider it a duplicate
+        const isSubset = ingredientWords.every(word => seenWords.includes(word)) ||
+                        seenWords.every(word => ingredientWords.includes(word));
+        
+        return isSubset;
+      });
+
+      if (!isDuplicate) {
+        seen.add(normalizedIngredient);
+        uniqueIngredients.push(ingredient);
+      }
+    }
+
+    return uniqueIngredients;
+  }
+
+  private static extractMissingIngredientsFromInstructions(instructionText: string, existingIngredients: string[]): string[] {
+    const missingIngredients: string[] = [];
+    const lowerInstructionText = instructionText.toLowerCase();
+    
+    // Common ingredients that might be mentioned in instructions but missing from ingredient list
+    const commonIngredients = [
+      'cheddar cheese', 'white cheddar cheese', 'shredded cheddar cheese',
+      'salt', 'pepper', 'black pepper', 'white pepper',
+      'olive oil', 'vegetable oil', 'butter', 'unsalted butter',
+      'garlic', 'onion', 'shallots', 'scallions',
+      'parsley', 'cilantro', 'basil', 'oregano', 'thyme',
+      'flour', 'all-purpose flour', 'sugar', 'brown sugar',
+      'milk', 'heavy cream', 'sour cream', 'cream cheese',
+      'eggs', 'egg', 'vanilla extract', 'baking powder', 'baking soda'
+    ];
+
+    // Check if any common ingredients are mentioned in instructions but not in existing ingredients
+    for (const ingredient of commonIngredients) {
+      const isInInstructions = lowerInstructionText.includes(ingredient.toLowerCase());
+      const isInExisting = existingIngredients.some(existing => 
+        existing.toLowerCase().includes(ingredient.toLowerCase())
+      );
+
+      if (isInInstructions && !isInExisting) {
+        // Capitalize the first letter
+        const capitalizedIngredient = ingredient.charAt(0).toUpperCase() + ingredient.slice(1);
+        missingIngredients.push(capitalizedIngredient);
+      }
+    }
+
+    return missingIngredients;
+  }
+
   private static extractListBySelectors($: cheerio.CheerioAPI, selectors: string[]): string[] {
     console.log(`Trying ${selectors.length} ingredient selectors...`);
     for (const selector of selectors) {
@@ -1211,7 +1293,8 @@ export class RecipeScraper {
         console.log(`Found ${filteredIngredients.length} valid ingredients from ${ingredients.length} total`);
 
         if (filteredIngredients.length > 0) {
-          return filteredIngredients;
+          // Remove duplicates before returning
+          return this.removeDuplicateIngredients(filteredIngredients);
         }
       }
     }
