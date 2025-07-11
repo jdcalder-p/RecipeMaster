@@ -84,7 +84,16 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
       [1/3]: '⅓',
       [2/3]: '⅔',
       [1/6]: '⅙',
-      [5/6]: '⅚'
+      [5/6]: '⅚',
+      // Add sixteenth fractions
+      [1/16]: '1/16',
+      [3/16]: '3/16',
+      [5/16]: '5/16',
+      [7/16]: '7/16',
+      [9/16]: '9/16',
+      [11/16]: '11/16',
+      [13/16]: '13/16',
+      [15/16]: '15/16'
     };
 
     // Find the closest fraction match
@@ -132,7 +141,16 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
       '⅝': 0.625,
       '⅞': 0.875,
       '⅙': 1/6,
-      '⅚': 5/6
+      '⅚': 5/6,
+      // Add sixteenth fractions for parsing
+      '1/16': 1/16,
+      '3/16': 3/16,
+      '5/16': 5/16,
+      '7/16': 7/16,
+      '9/16': 9/16,
+      '11/16': 11/16,
+      '13/16': 13/16,
+      '15/16': 15/16
     };
 
     // Check for range quantities like "1 to 2", "1-2", "1 or 2"
