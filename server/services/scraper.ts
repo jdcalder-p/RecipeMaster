@@ -1063,7 +1063,14 @@ export class RecipeScraper {
       return null;
     }).filter(Boolean);
 
-    // If we have multiple individual instructions, try to combine them intelligently
+    // If we have HowToSection objects with section names, return them as-is
+    const hasSections = processedInstructions.some(inst => inst.sectionName);
+    if (hasSections) {
+      console.log(`📋 Found ${processedInstructions.length} instruction sections with names`);
+      return processedInstructions;
+    }
+
+    // If we have multiple individual instructions without sections, try to combine them intelligently
     if (processedInstructions.length > 1) {
       // Check if all are single steps - if so, combine them into one section
       const allSingleSteps = processedInstructions.every(inst => inst.steps.length === 1);
