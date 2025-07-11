@@ -1,4 +1,3 @@
-
 import { z } from "zod";
 
 // Remove PostgreSQL-specific imports and keep only the types we need

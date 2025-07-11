@@ -20,36 +20,36 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautif
 const standardizeUnit = (unit: string): string => {
   if (!unit) return "";
   const unitLower = unit.toLowerCase().trim();
-  
+
   const unitMap: { [key: string]: string } = {
     // Cup variations
     'c': 'Cup',
     'cup': 'Cup', 
     'cups': 'Cup',
-    
+
     // Tablespoon variations  
     'tbsp': 'Tbsp',
     'tablespoon': 'Tbsp',
     'tablespoons': 'Tbsp',
     't': 'Tbsp',
-    
+
     // Teaspoon variations
     'tsp': 'tsp',
     'teaspoon': 'tsp',
     'teaspoons': 'tsp',
-    
+
     // Ounce variations
     'oz': 'oz',
     'ounce': 'oz',
     'ounces': 'oz',
-    
+
     // Other common units
     'lb': 'lb',
     'lbs': 'lb',
     'pound': 'lb',
     'pounds': 'lb',
   };
-  
+
   return unitMap[unitLower] || unit;
 };
 
@@ -114,18 +114,18 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
         sourceUrl: recipe.sourceUrl || "",
         isFavorite: recipe.isFavorite || false,
       });
-      
+
       // Convert recipe ingredients to editable format
       if (recipe.ingredients && recipe.ingredients.length > 0) {
         setIngredientSections(recipe.ingredients);
       } else {
         setIngredientSections([{ items: [{ name: "" }] }]);
       }
-      
+
       // Handle both old string format and new section format with steps
       if (recipe.instructions && recipe.instructions.length > 0) {
         let formattedInstructions: { text: string; imageUrl?: string }[] = [];
-        
+
         recipe.instructions.forEach((instruction: any) => {
           if (typeof instruction === 'string') {
             // Old format: direct string
@@ -150,14 +150,14 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
             });
           }
         });
-        
+
         // Filter out empty instructions and section headers that are too short
         const validInstructions = formattedInstructions.filter(inst => 
           inst.text && 
           inst.text.trim().length > 0 &&
           !inst.text.match(/^(makes?\s+\d+|serves?\s+\d+)/i) // Filter out serving size headers
         );
-        
+
         if (validInstructions.length > 0) {
           setInstructions(validInstructions);
         } else {
@@ -191,10 +191,10 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     },
     onError: (error: any) => {
       console.error("Update recipe error:", error);
-      
+
       // Extract specific error message from the response
       let errorMessage = "Failed to update recipe. Please try again.";
-      
+
       if (error?.message) {
         if (error.message.includes("401")) {
           errorMessage = "You are not authorized to update this recipe.";
@@ -206,7 +206,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
           errorMessage = error.message;
         }
       }
-      
+
       toast({
         title: "Update Failed",
         description: errorMessage,
@@ -220,7 +220,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     console.log("Form errors:", errors);
     console.log("Ingredient sections:", ingredientSections);
     console.log("Instructions:", instructions);
-    
+
     // Check if title is empty (required field)
     if (!data.title || data.title.trim() === "") {
       toast({
@@ -230,7 +230,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
       });
       return;
     }
-    
+
     const filteredSections = ingredientSections
       .map(section => ({
         ...section,
@@ -243,9 +243,9 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
           }))
       }))
       .filter(section => section.items.length > 0);
-    
+
     const filteredInstructions = instructions.filter(instruction => instruction.text.trim() !== "");
-    
+
     if (filteredSections.length === 0) {
       toast({
         title: "Validation Error",
@@ -254,7 +254,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
       });
       return;
     }
-    
+
     if (filteredInstructions.length === 0) {
       toast({
         title: "Validation Error",
@@ -353,7 +353,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
       // Handle ingredient reordering within and between sections
       const sourceDroppableId = source.droppableId;
       const destDroppableId = destination.droppableId;
-      
+
       if (sourceDroppableId === destDroppableId) {
         // Same section
         const sectionIndex = parseInt(sourceDroppableId.split('-')[1]);
@@ -481,7 +481,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
                     Add Section
                   </Button>
                 </div>
-                
+
                 <Droppable droppableId="sections" type="section">
                   {(provided) => (
                     <div
@@ -527,7 +527,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
                                     </Button>
                                   )}
                                 </div>
-                                
+
                                 <Droppable droppableId={`section-${sectionIndex}`} type="ingredient">
                                   {(provided) => (
                                     <div
@@ -688,7 +688,7 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
-              
+
               {/* Debug info for validation */}
               {Object.keys(errors).length > 0 && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">

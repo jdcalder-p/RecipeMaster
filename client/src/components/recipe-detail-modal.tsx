@@ -52,7 +52,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
 
     // Check for range quantities like "1 to 2", "1-2", "1 or 2"
     const rangeMatch = quantity.trim().match(/^(\d+(?:\.\d+)?(?:[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])?(?:\/\d+)?)\s+(?:to|-|or)\s+(\d+(?:\.\d+)?(?:[¼½¾⅓⅔⅛⅜⅝⅞⅙⅚])?(?:\/\d+)?)$/i);
-    
+
     if (rangeMatch) {
       // Parse both parts of the range
       const parseQuantityPart = (part: string): number => {
@@ -74,11 +74,11 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
 
       const firstValue = parseQuantityPart(rangeMatch[1]);
       const secondValue = parseQuantityPart(rangeMatch[2]);
-      
+
       // Scale both values
       const scaledFirst = firstValue * multiplier;
       const scaledSecond = secondValue * multiplier;
-      
+
       // Convert both scaled values to fraction format
       const formatNumber = (num: number): string => {
         const tolerance = 0.001;
@@ -122,7 +122,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
               const commonDivisor = gcd(numerator, denom);
               const finalNum = numerator / commonDivisor;
               const finalDenom = denom / commonDivisor;
-              
+
               if (finalDenom !== 1) {
                 return wholePart > 0 ? `${wholePart} ${finalNum}/${finalDenom}` : `${finalNum}/${finalDenom}`;
               }
@@ -498,7 +498,7 @@ export function RecipeDetailModal({ recipe, open, onOpenChange, onEditRecipe }: 
                   let stepCounter = recipe.instructions
                     .slice(0, sectionIndex)
                     .reduce((acc, sec) => acc + (sec.steps?.length || 0), 0);
-                  
+
                   return (
                     <div key={sectionIndex} className="space-y-4">
                       {section.sectionName && (
