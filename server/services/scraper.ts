@@ -685,25 +685,67 @@ export class RecipeScraper {
     }> = [];
 
     // Try to extract ingredients from specific WP Recipe Maker selectors first
-    const wprmIngredients = $('.wprm-recipe-ingredient, .wprm-recipe-ingredient-name');
+    const wprmIngredients = $('.wprm-recipe-ingredient, .wprm-recipe-ingredient-name, .wprm-recipe-ingredient-amount, .wprm-recipe-ingredient-unit');
     if (wprmIngredients.length > 0) {
       const ingredients: Array<{ name: string; quantity?: string; unit?: string; }> = [];
       
+      // Group ingredients by their parent container
+      const ingredientGroups = new Map<string, any>();
+      
       wprmIngredients.each((_, element) => {
         const $element = $(element);
-        const text = $element.text().trim();
+        const $parent = $element.closest('.wprm-recipe-ingredient');
         
-        if (text && this.looksLikeIngredient(text)) {
-          const parsed = this.parseIngredientText(text);
-          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-          ingredients.push(parsed);
+        if ($parent.length > 0) {
+          const parentId = $parent.index();
+          if (!ingredientGroups.has(parentId.toString())) {
+            ingredientGroups.set(parentId.toString(), {
+              amount: '',
+              unit: '',
+              name: ''
+            });
+          }
+          
+          const group = ingredientGroups.get(parentId.toString());
+          
+          if ($element.hasClass('wprm-recipe-ingredient-amount')) {
+            group.amount = $element.text().trim();
+          } else if ($element.hasClass('wprm-recipe-ingredient-unit')) {
+            group.unit = $element.text().trim();
+          } else if ($element.hasClass('wprm-recipe-ingredient-name')) {
+            group.name = $element.text().trim();
+          } else {
+            const text = $element.text().trim();
+            if (text && this.looksLikeIngredient(text)) {
+              const parsed = this.parseIngredientText(text);
+              parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+              ingredients.push(parsed);
+            }
+          }
         }
       });
       
-      if (ingredients.length > 0) {
+      // Process grouped ingredients
+      for (const group of ingredientGroups.values()) {
+        if (group.name && this.looksLikeIngredient(group.name)) {
+          const ingredient = {
+            name: group.name.charAt(0).toUpperCase() + group.name.slice(1),
+            quantity: group.amount || undefined,
+            unit: group.unit || undefined
+          };
+          ingredients.push(ingredient);
+        }
+      }
+      
+      // Remove duplicates based on name
+      const uniqueIngredients = ingredients.filter((ingredient, index, self) =>
+        index === self.findIndex(other => other.name.toLowerCase() === ingredient.name.toLowerCase())
+      );
+      
+      if (uniqueIngredients.length > 0) {
         sections.push({
           sectionName: undefined,
-          items: ingredients
+          items: uniqueIngredients
         });
         return sections;
       }
@@ -987,9 +1029,30 @@ export class RecipeScraper {
   }
 
   private static looksLikeIngredient(text: string): boolean {
+    // Exclude FAQ content and other non-ingredient text
+    const excludePatterns = [
+      /\b(what|why|how|can i|should i|will|would|could|might|may|do|does|is|are|about|tips|note|storage|nutrition|FAQ|frequently|asked|question|answer|copyright|recipe card|print|comment|share|follow|social|contact|privacy|terms|related|similar|more recipes|other recipes|you might also like|recommended|popular|trending|recent|newsletter|subscribe|join|sign up|login|register|account|profile|settings|search|category|tag|archive|blog|home|menu|navigation|footer|header|sidebar|advertisement|ad|sponsored|affiliate|disclaimer|disclosure|legal|policy|cookie|gdpr|ccpa|california|europe|eu)\b/i,
+      /\?\s*$/, // Ends with question mark
+      /\b(adding|substitute|replace|instead|alternative|option|variation|different|best|type|kind|brand|store|buy|purchase|find|where|when|traditional|regular|mix|combination|profile|enhance|flavor|mellow|blend|beautifully)\b/i,
+      /\b(sharp|white|cheddar|cheese|traditionally|used|because|adds|tangy|creamy|even|also|can|be|for|a|different|flavor|profile)\b.*\b(sharp|white|cheddar|cheese|traditionally|used|because|adds|tangy|creamy|even|also|can|be|for|a|different|flavor|profile)\b/i,
+      /\b(absolutely|adding|minced|garlic|potato|mixture|enhance|overall|sauté|with|shallots|bit|butter|before|mixing|into|potatoes|mellow|sharpness|blend|beautifully|other|ingredients)\b/i,
+    ];
+
+    // Check if text matches any exclude pattern
+    for (const pattern of excludePatterns) {
+      if (pattern.test(text)) {
+        return false;
+      }
+    }
+
+    // Check if text is too long (likely not a single ingredient)
+    if (text.length > 150) {
+      return false;
+    }
+
     // Check if text looks like an ingredient (contains measurements, common ingredient words)
     const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b)\b/i;
-    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese)\b/i;
+    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|bacon|shallot|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced)\b/i;
 
     return measurementPattern.test(text) || ingredientWords.test(text);
   }
