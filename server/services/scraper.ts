@@ -172,39 +172,81 @@ export class RecipeScraper {
     // Check if we have instruction sections that could indicate ingredient groupings
     if (instructions.length > 0 && instructions.some(inst => inst.sectionName)) {
       console.log(`🔧 Creating ingredient sections based on instruction sections`);
+      console.log(`🔍 Available instruction sections:`, instructions.map(inst => inst.sectionName).filter(Boolean));
       
       // Map instruction sections to ingredient sections
       const sectionIngredients = new Map<string, string[]>();
       const generalIngredients: string[] = [];
       
-      // For this specific recipe structure, group ingredients by likely sections
+      // Create ingredient sections based on the instruction sections we found
+      for (const instruction of instructions) {
+        if (instruction.sectionName) {
+          // Extract section names from instructions for ingredient grouping
+          const sectionName = instruction.sectionName;
+          console.log(`🏷️ Processing section: "${sectionName}"`);
+          
+          // Group ingredients by likely sections based on instruction section names
+          for (const ingredient of uniqueIngredients) {
+            const lowerIng = ingredient.toLowerCase();
+            const lowerSection = sectionName.toLowerCase();
+            
+            // Check if ingredient should go in this section
+            let shouldAddToSection = false;
+            
+            if (lowerSection.includes('green bean') || lowerSection.includes('prepare the green beans')) {
+              // Green beans section ingredients
+              if (lowerIng.includes('green bean') || lowerIng.includes('sundried tomato') || 
+                  lowerIng.includes('toasted almond') || lowerIng.includes('parsley') ||
+                  lowerIng.includes('garlic, minced') || 
+                  (lowerIng.includes('butter') && lowerIng.includes('tablespoons'))) {
+                shouldAddToSection = true;
+              }
+            } else if (lowerSection.includes('chicken') || lowerSection.includes('cook the chicken')) {
+              // Chicken section ingredients
+              if (lowerIng.includes('chicken') || lowerIng.includes('olive oil') ||
+                  lowerIng.includes('salt and pepper')) {
+                shouldAddToSection = true;
+              }
+            } else if (lowerSection.includes('sauce') || lowerSection.includes('mushroom')) {
+              // Sauce/mushroom section ingredients
+              if (lowerIng.includes('mushroom') || lowerIng.includes('shallot') ||
+                  lowerIng.includes('port wine') || lowerIng.includes('stock') ||
+                  lowerIng.includes('raisin') || lowerIng.includes('cream') ||
+                  lowerIng.includes('cornstarch') || lowerIng.includes('nutmeg') ||
+                  lowerIng.includes('sage') || lowerIng.includes('vinegar') ||
+                  (lowerIng.includes('butter') && !lowerIng.includes('tablespoons'))) {
+                shouldAddToSection = true;
+              }
+            }
+            
+            if (shouldAddToSection) {
+              if (!sectionIngredients.has(sectionName)) {
+                sectionIngredients.set(sectionName, []);
+              }
+              // Check if this ingredient is already assigned to avoid duplicates
+              const alreadyAssigned = Array.from(sectionIngredients.values()).some(arr => 
+                arr.some(existing => existing.toLowerCase() === ingredient.toLowerCase())
+              );
+              if (!alreadyAssigned) {
+                sectionIngredients.get(sectionName)!.push(ingredient);
+                console.log(`✅ Added "${ingredient}" to section "${sectionName}"`);
+              }
+            }
+          }
+        }
+      }
+      
+      // Collect all ingredients that were assigned to sections
+      const assignedIngredients = new Set<string>();
+      for (const ingredients of sectionIngredients.values()) {
+        ingredients.forEach(ing => assignedIngredients.add(ing.toLowerCase()));
+      }
+      
+      // Add remaining unassigned ingredients to general list
       for (const ingredient of uniqueIngredients) {
-        const lowerIng = ingredient.toLowerCase();
-        
-        if (lowerIng.includes('green bean') || lowerIng.includes('sundried tomato') || 
-            lowerIng.includes('toasted almond') || lowerIng.includes('parsley') ||
-            (lowerIng.includes('butter') && !generalIngredients.some(gi => gi.toLowerCase().includes('butter'))) ||
-            (lowerIng.includes('shallot') && lowerIng.includes('finely chopped'))) {
-          
-          const sectionName = "For the Green Beans:";
-          if (!sectionIngredients.has(sectionName)) {
-            sectionIngredients.set(sectionName, []);
-          }
-          sectionIngredients.get(sectionName)!.push(ingredient);
-        } else if (lowerIng.includes('chicken') || lowerIng.includes('mushroom') || 
-                   lowerIng.includes('port wine') || lowerIng.includes('stock') ||
-                   lowerIng.includes('raisin') || lowerIng.includes('cream') ||
-                   lowerIng.includes('cornstarch') || lowerIng.includes('nutmeg') ||
-                   lowerIng.includes('sage') || lowerIng.includes('vinegar') ||
-                   lowerIng.includes('garlic olive oil')) {
-          
-          const sectionName = "For the Chicken and Sauce:";
-          if (!sectionIngredients.has(sectionName)) {
-            sectionIngredients.set(sectionName, []);
-          }
-          sectionIngredients.get(sectionName)!.push(ingredient);
-        } else {
+        if (!assignedIngredients.has(ingredient.toLowerCase())) {
           generalIngredients.push(ingredient);
+          console.log(`📝 Added "${ingredient}" to general ingredients`);
         }
       }
       
@@ -219,34 +261,29 @@ export class RecipeScraper {
               return parsed;
             })
           });
+          console.log(`🏗️ Created section "${sectionName}" with ${ingredients.length} ingredients`);
         }
       }
       
-      // Add any remaining general ingredients to the first section or create a general section
+      // Add any remaining general ingredients as the first section
       if (generalIngredients.length > 0) {
-        if (structuredIngredients.length > 0) {
-          // Add to the first section
-          const generalParsed = generalIngredients.map((ing: string) => {
-            const parsed = this.parseIngredientText(ing);
-            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-            return parsed;
-          });
-          structuredIngredients[0].items.unshift(...generalParsed);
-        } else {
-          // Create a general section
-          structuredIngredients.push({
-            sectionName: undefined,
-            items: generalIngredients.map((ing: string) => {
-              const parsed = this.parseIngredientText(ing);
-              parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-              return parsed;
-            })
-          });
-        }
+        const generalParsed = generalIngredients.map((ing: string) => {
+          const parsed = this.parseIngredientText(ing);
+          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+          return parsed;
+        });
+        
+        // Insert at the beginning
+        structuredIngredients.unshift({
+          sectionName: "Main Ingredients",
+          items: generalParsed
+        });
+        console.log(`🏗️ Created "Main Ingredients" section with ${generalIngredients.length} ingredients`);
       }
       
     } else {
       // Fallback to single section if no instruction sections found
+      console.log(`📝 No instruction sections found, creating single ingredient section`);
       if (uniqueIngredients.length > 0) {
         structuredIngredients.push({ 
           sectionName: undefined,
