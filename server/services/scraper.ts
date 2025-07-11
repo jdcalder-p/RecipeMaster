@@ -204,7 +204,7 @@ export class RecipeScraper {
                  (lowerIng.includes('butter') && (lowerIng.includes('melt') || lowerIng.includes('3') || lowerIng.includes('tbsp'))) ||
                  (lowerIng.includes('egg') && !lowerIng.includes('yolk') && lowerIng.includes('1')) ||
                  (lowerIng.includes('salt') && !lowerIng.includes('salted') && lowerIng.includes('1') && lowerIng.includes('tsp')) ||
-                 (lowerIng.includes('bread flour') && (lowerIng.includes('3') || lowerIng.includes('2/3'))) ||
+                 (lowerIng.includes('bread flour') && (lowerIng.includes('3') || lowerIng.includes('2/3') || /3\s*2\/3/.test(lowerIng))) ||
                  (lowerIng.includes('cream') && lowerIng.includes('heavy') && (lowerIng.includes('pour') || lowerIng.includes('whip')))) {
           rollsIngredients.push(ingredient);
           assigned = true;
