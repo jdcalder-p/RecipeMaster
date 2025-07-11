@@ -940,14 +940,48 @@ export class RecipeScraper {
     if (typeof image === 'string') {
       imageUrl = image;
     } else if (Array.isArray(image) && image.length > 0) {
-      imageUrl = typeof image[0] === 'string' ? image[0] : image[0].url || '';
+      // Try to find the best quality image from the array
+      for (const img of image) {
+        if (typeof img === 'string') {
+          imageUrl = img;
+          break;
+        } else if (img && typeof img === 'object') {
+          // Prefer higher quality images
+          if (img.url && (img.url.includes('1080') || img.url.includes('large') || img.url.includes('full'))) {
+            imageUrl = img.url;
+            break;
+          } else if (img.contentUrl && (img.contentUrl.includes('1080') || img.contentUrl.includes('large') || img.contentUrl.includes('full'))) {
+            imageUrl = img.contentUrl;
+            break;
+          } else if (img.url) {
+            imageUrl = img.url;
+          } else if (img.contentUrl) {
+            imageUrl = img.contentUrl;
+          }
+        }
+      }
+      
+      // If no high-quality image found, use the first available
+      if (!imageUrl && image.length > 0) {
+        const firstImg = image[0];
+        if (typeof firstImg === 'string') {
+          imageUrl = firstImg;
+        } else if (firstImg && typeof firstImg === 'object') {
+          imageUrl = firstImg.url || firstImg.contentUrl || '';
+        }
+      }
     } else if (image && typeof image === 'object') {
       imageUrl = image.url || image.contentUrl || '';
     }
     
-    // Filter out placeholder SVG images
+    // Filter out placeholder SVG images but allow AVIF, WebP, and other modern formats
     if (imageUrl && (imageUrl.includes('data:image/svg+xml') || imageUrl.includes('placeholder'))) {
       return '';
+    }
+    
+    // Log the extracted image URL for debugging
+    if (imageUrl) {
+      console.log(`📷 EXTRACTED IMAGE URL: ${imageUrl}`);
     }
     
     return imageUrl;
@@ -1073,30 +1107,80 @@ export class RecipeScraper {
   }
 
   private static extractImageBySelectors($: cheerio.CheerioAPI, selectors: string[], baseUrl: string): string {
-    for (const selector of selectors) {
-      const img = $(selector).first();
-      if (img.length) {
-        const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || img.attr('data-original');
+    // Enhanced selectors to find recipe images
+    const enhancedSelectors = [
+      ...selectors,
+      // WordPress specific selectors
+      '.wp-post-image',
+      '.attachment-large',
+      '.attachment-full',
+      '.size-large',
+      '.size-full',
+      // Recipe card specific
+      '.recipe-card-image img',
+      '.recipe-featured-image img',
+      '.entry-featured-image img',
+      // Article/post images
+      '.post-thumbnail img',
+      '.featured-image img',
+      '.hero-image img',
+      // General content images
+      'article img:first-of-type',
+      '.content img:first-of-type',
+      '.main img:first-of-type',
+      // Look for images with recipe-related names in src
+      'img[src*="recipe"]',
+      'img[src*="potato"]',
+      'img[src*="romanoff"]',
+      'img[src*="dish"]',
+      'img[src*="food"]',
+      // Look for high-quality images
+      'img[src*="1080"]',
+      'img[src*="large"]',
+      'img[src*="full"]'
+    ];
+    
+    console.log(`🔍 Trying ${enhancedSelectors.length} image selectors...`);
+    
+    for (const selector of enhancedSelectors) {
+      const imgs = $(selector);
+      console.log(`Selector "${selector}" found ${imgs.length} images`);
+      
+      for (let i = 0; i < imgs.length; i++) {
+        const img = imgs.eq(i);
+        const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || 
+                   img.attr('data-original') || img.attr('srcset')?.split(' ')[0];
         const alt = img.attr('alt') || '';
         
         if (src && this.isValidRecipeImage(src, alt)) {
-          return src.startsWith('http') ? src : new URL(src, baseUrl).href;
+          const fullUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
+          console.log(`✅ Found valid recipe image: ${fullUrl}`);
+          return fullUrl;
+        } else if (src) {
+          console.log(`❌ Rejected image: ${src} (failed validation)`);
         }
       }
     }
     
     // If no image found with selectors, try to find any large image on the page
+    console.log(`🔍 No image found with selectors, scanning all images...`);
     const allImages = $('img');
+    console.log(`Found ${allImages.length} total images on page`);
+    
     for (let i = 0; i < allImages.length; i++) {
       const img = allImages.eq(i);
-      const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || img.attr('data-original');
+      const src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || 
+                 img.attr('data-original') || img.attr('srcset')?.split(' ')[0];
       const alt = img.attr('alt') || '';
       
       if (src && this.isValidRecipeImage(src, alt)) {
-        return src.startsWith('http') ? src : new URL(src, baseUrl).href;
+        const fullUrl = src.startsWith('http') ? src : new URL(src, baseUrl).href;
+        console.log(`✅ Found valid recipe image from all images: ${fullUrl}`);
+        return fullUrl;
       }
     }
     
+    console.log(`❌ No valid recipe image found`);
     return '';
   }
 
