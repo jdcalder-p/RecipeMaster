@@ -1231,22 +1231,37 @@ export class RecipeScraper {
   }
 
   private static extractCoreIngredientName(ingredient: string): string {
-    // Remove quantities, measurements, and common descriptors
+    // Remove quantities, fractions, and measurements first
     let core = ingredient
-      .replace(/^\d+(\s*\/\s*\d+)?\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\s*/i, '')
-      .replace(/^(large|medium|small|whole|fresh|dried|ground|chopped|minced|sliced|diced|grated|shredded|crumbled|softened|melted|packed|optional)\s+/gi, '')
+      .replace(/^\d+(\s*\/\s*\d+)?(\s+\d+\/\d+)?\s*/i, '') // Remove numbers and fractions at start
+      .replace(/^(½|¼|¾|⅓|⅔|⅛|⅜|⅝|⅞)\s*/i, '') // Remove fraction symbols
+      .replace(/\s*(cups?|cup|c\b|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|pints?|quarts?|gallons?|cloves?|pieces?|slices?|strips?|sprigs?|dashes?|pinches?|cans?|jars?|bottles?|bags?|boxes?|packages?|heads?|bulbs?|stalks?|bunches?)\s*/gi, ' ')
+      .replace(/^(large|medium|small|whole|fresh|dried|ground|chopped|minced|sliced|diced|grated|shredded|crumbled|softened|melted|packed|optional|white|sharp|aged|extra|virgin|unsalted|salted|heavy|light|2%|whole)\s+/gi, '')
       .replace(/\s*,\s*(shredded|grated|crumbled|chopped|minced|sliced|diced|optional).*$/i, '')
       .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical content
+      .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
     
-    // Extract the main noun (last significant word, excluding descriptors)
-    const words = core.split(/\s+/);
+    // Handle specific ingredient patterns
+    if (/potato/i.test(core)) return 'potatoes';
+    if (/bacon/i.test(core)) return 'bacon';
+    if (/shallot/i.test(core)) return 'shallots';
+    if (/sour\s*cream/i.test(core)) return 'sour cream';
+    if (/cheddar/i.test(core) || /cheese/i.test(core)) return 'cheese';
+    if (/parmesan/i.test(core)) return 'parmesan';
+    if (/goat/i.test(core)) return 'goat cheese';
+    if (/butter/i.test(core)) return 'butter';
+    if (/salt/i.test(core) && /pepper/i.test(core)) return 'salt and pepper';
+    if (/bacon\s*bits/i.test(core)) return 'bacon bits';
+    
+    // Extract the main ingredient name - prefer the first meaningful word for compound ingredients
+    const words = core.split(/\s+/).filter(word => word.length > 2);
     if (words.length > 0) {
-      // Return the core ingredient name
-      return words[words.length - 1];
+      // For compound ingredients, return the first significant word
+      return words[0].toLowerCase();
     }
     
-    return core;
+    return core.toLowerCase();
   }
 
   private static extractMissingIngredientsFromInstructions(instructionText: string, existingIngredients: string[]): string[] {
