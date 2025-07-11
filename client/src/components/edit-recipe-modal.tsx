@@ -53,7 +53,15 @@ const standardizeUnit = (unit: string): string => {
   return unitMap[unitLower] || unit;
 };
 
-const formSchema = insertRecipeSchema.extend({
+const formSchema = insertRecipeSchema.omit({ instructions: true, ingredients: true }).extend({
+  ingredients: z.array(z.object({
+    sectionName: z.string().optional(),
+    items: z.array(z.object({
+      name: z.string().min(1, "Ingredient name is required"),
+      quantity: z.string().optional(),
+      unit: z.string().optional(),
+    })).min(1, "At least one ingredient is required"),
+  })).min(1, "At least one ingredient section is required"),
   instructions: z.array(z.object({
     text: z.string().min(1, "Instruction text is required"),
     imageUrl: z.string().optional(),
@@ -171,7 +179,11 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
     }
   }, [recipe, open, reset, setValue]);
 
-  // Sync instructions state with form
+  // Sync ingredients and instructions state with form
+  useEffect(() => {
+    setValue("ingredients", ingredientSections);
+  }, [ingredientSections, setValue]);
+
   useEffect(() => {
     setValue("instructions", instructions);
   }, [instructions, setValue]);
@@ -264,17 +276,22 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
       return;
     }
 
+    // Format instructions for backend compatibility
+    const formattedInstructions = [{
+      steps: filteredInstructions
+    }];
+
     console.log("Submitting recipe update:", {
       ...data,
       ingredients: filteredSections,
-      instructions: filteredInstructions,
+      instructions: formattedInstructions,
       servings: servingSize,
     });
 
     updateMutation.mutate({
       ...data,
       ingredients: filteredSections,
-      instructions: filteredInstructions,
+      instructions: formattedInstructions,
       servings: servingSize,
     });
   };
@@ -370,6 +387,12 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
         newSections[destSectionIndex].items.splice(destination.index, 0, movedItem);
         setIngredientSections(newSections);
       }
+    } else if (type === "instruction") {
+      // Handle instruction reordering
+      const newInstructions = Array.from(instructions);
+      const [reorderedInstruction] = newInstructions.splice(source.index, 1);
+      newInstructions.splice(destination.index, 0, reorderedInstruction);
+      setInstructions(newInstructions);
     }
   };
 
@@ -624,56 +647,83 @@ export function EditRecipeModal({ recipe, open, onOpenChange }: EditRecipeModalP
 
               <div>
                 <Label>Instructions *</Label>
-                <div className="space-y-2">
-                  {instructions.map((instruction, index) => (
-                    <Card key={index} className="p-3">
-                      <div className="space-y-3">
-                        <div className="flex items-start space-x-2">
-                          <span className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mt-1 flex-shrink-0">
-                            {index + 1}
-                          </span>
-                          <Textarea
-                            placeholder="Enter instruction..."
-                            value={instruction.text}
-                            onChange={(e) => updateInstruction(index, 'text', e.target.value)}
-                            className="flex-1"
-                            rows={2}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeInstruction(index)}
-                            disabled={instructions.length === 1}
-                            className="mt-1"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="ml-8">
-                          <Input
-                            placeholder="Optional photo URL for this step..."
-                            value={instruction.imageUrl || ""}
-                            onChange={(e) => updateInstruction(index, 'imageUrl', e.target.value)}
-                            className="text-sm"
-                          />
-                          {instruction.imageUrl && (
-                            <div className="mt-2">
-                              <img 
-                                src={instruction.imageUrl} 
-                                alt={`Step ${index + 1} preview`}
-                                className="rounded-lg max-w-full h-32 object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
-                            </div>
+                <Droppable droppableId="instructions" type="instruction">
+                  {(provided) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className="space-y-2"
+                    >
+                      {instructions.map((instruction, index) => (
+                        <Draggable
+                          key={index}
+                          draggableId={`instruction-${index}`}
+                          index={index}
+                        >
+                          {(provided, snapshot) => (
+                            <Card
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={`p-3 ${snapshot.isDragging ? 'bg-blue-50 shadow-lg' : ''}`}
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-start space-x-2">
+                                  <div
+                                    {...provided.dragHandleProps}
+                                    className="cursor-grab hover:bg-gray-100 p-1 rounded mt-1"
+                                  >
+                                    <GripVertical className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                  <span className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mt-1 flex-shrink-0">
+                                    {index + 1}
+                                  </span>
+                                  <Textarea
+                                    placeholder="Enter instruction..."
+                                    value={instruction.text}
+                                    onChange={(e) => updateInstruction(index, 'text', e.target.value)}
+                                    className="flex-1"
+                                    rows={2}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeInstruction(index)}
+                                    disabled={instructions.length === 1}
+                                    className="mt-1"
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <div className="ml-12">
+                                  <Input
+                                    placeholder="Optional photo URL for this step..."
+                                    value={instruction.imageUrl || ""}
+                                    onChange={(e) => updateInstruction(index, 'imageUrl', e.target.value)}
+                                    className="text-sm"
+                                  />
+                                  {instruction.imageUrl && (
+                                    <div className="mt-2">
+                                      <img 
+                                        src={instruction.imageUrl} 
+                                        alt={`Step ${index + 1} preview`}
+                                        className="rounded-lg max-w-full h-32 object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </Card>
                           )}
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
                 <Button
                   type="button"
                   variant="ghost"
