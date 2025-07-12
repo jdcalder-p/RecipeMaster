@@ -1560,6 +1560,13 @@ export class RecipeScraper {
       return false;
     }
 
+    // Special case for mixed fractions like "3 2/3 c bread flour"
+    const mixedFractionIngredient = /^\d+\s+\d+\/\d+\s+c?\s*(bread\s*flour|flour|cup|cups|tbsp|tsp|oz|lb)\b/i;
+    if (mixedFractionIngredient.test(text)) {
+      console.log(`✅ Found mixed fraction ingredient: "${text}"`);
+      return true;
+    }
+
     // Special case for very short but valid ingredients like "1 Yolk", "Salt", "Pepper"
     const shortValidIngredients = /^\d+\s+(yolk|yolks|egg|eggs|clove|cloves|cup|cups|tbsp|tsp|oz|lb)\b/i;
     const singleWordIngredients = /^(salt|pepper|sugar|flour|butter|oil|water|milk|cream|vanilla|yeast|baking|powder|soda|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|cornstarch|flour|starch)$/i;
@@ -1572,19 +1579,19 @@ export class RecipeScraper {
       return true;
     }
 
-    // Check if text looks like an ingredient (contains measurements, common ingredient words)
-    const measurementPattern = /\b\d+(\s*\/\s*\d+)?\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b|pinch|dash|handful)\b/i;
-    const ingredientWords = /\b(flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced|white|sharp|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|cream cheese|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed|yolk|yolks|wine|port|rum|brandy|whiskey|vodka|beer|sherry|champagne|cognac|liqueur|raisins|cornstarch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|cornstarch|flour|starch|arrowroot|mushrooms|mushroom|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini|enoki|maitake)\b/i;
+    // Enhanced measurement pattern to catch "3 2/3 c" format
+    const measurementPattern = /\b(\d+(\s*\/\s*\d+)?|\d+\s+\d+\/\d+)\s*(cup|cups|tbsp|tablespoon|tsp|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|liter|inch|inches|c\b|T\b|t\b|pinch|dash|handful)\b/i;
+    const ingredientWords = /\b(bread\s*flour|flour|sugar|butter|milk|egg|salt|pepper|oil|water|vanilla|baking|powder|soda|yeast|cream|cheese|potato|potatoes|bacon|shallot|shallots|sour|cheddar|goat|parmesan|russet|bits|grated|shredded|crumbled|large|small|medium|fresh|dried|ground|whole|chopped|minced|sliced|diced|white|sharp|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|cream cheese|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed|yolk|yolks|wine|port|rum|brandy|whiskey|vodka|beer|sherry|champagne|cognac|liqueur|raisins|cornstarch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|cornstarch|flour|starch|arrowroot|mushrooms|mushroom|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini|enoki|maitake)\b/i;
 
     // Special case for numbered items that look like ingredients (e.g., "4 large russet potatoes")
-    const numberedIngredientPattern = /^\d+\s+(large|medium|small|whole|fresh|dried|sliced|chopped|minced)?\s*(russet|yukon|red|white|sweet|ruby|golden|dark|light|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini)?\s*(potato|potatoes|onion|onions|carrot|carrots|apple|apples|egg|eggs|yolk|yolks|clove|cloves|cup|cups|tbsp|tsp|oz|lb|pound|pounds|wine|port|rum|brandy|raisins|nutmeg|cinnamon|cornstarch|starch|mushrooms|mushroom)\b/i;
+    const numberedIngredientPattern = /^\d+(\s+\d+\/\d+)?\s+(large|medium|small|whole|fresh|dried|sliced|chopped|minced)?\s*(russet|yukon|red|white|sweet|ruby|golden|dark|light|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini)?\s*(potato|potatoes|onion|onions|carrot|carrots|apple|apples|egg|eggs|yolk|yolks|clove|cloves|cup|cups|tbsp|tsp|oz|lb|pound|pounds|wine|port|rum|brandy|raisins|nutmeg|cinnamon|cornstarch|starch|mushrooms|mushroom|bread\s*flour|flour)\b/i;
 
     // Special case for cheese types that might be mentioned in instructions
     const cheesePattern = /\b(cheddar|cheese|goat|parmesan|swiss|mozzarella|american|monterey|jack|romano|asiago|fontina|gruyere|brie|camembert|feta|ricotta|cottage|blue|roquefort|stilton|provolone|colby|pepper jack|string|processed)\b/i;
 
     // Special case for alcohol and cooking ingredients
     const alcoholPattern = /\b(wine|port|rum|brandy|whiskey|vodka|beer|sherry|champagne|cognac|liqueur|cooking wine|ruby port|white wine|red wine)\b/i;
-    const cookingPattern = /\b(cornstarch|arrowroot|flour|starch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|raisins|dried fruit)\b/i;
+    const cookingPattern = /\b(cornstarch|arrowroot|flour|bread\s*flour|starch|nutmeg|cinnamon|paprika|oregano|thyme|basil|rosemary|sage|parsley|cilantro|dill|chives|raisins|dried fruit)\b/i;
 
     // Special case for mushroom varieties (including specialty types)
     const mushroomPattern = /\b(mushrooms?|portobello|shiitake|cremini|button|oyster|chantelle|chanterelle|morel|porcini|enoki|maitake|king oyster|lions mane|hen of the woods)\b/i;
