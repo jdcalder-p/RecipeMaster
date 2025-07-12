@@ -682,8 +682,7 @@ if (icingIngredients.length > 0) {
 
     if (ingredientsWithSections.length > 0) {
       // Keep all ingredients exactly as they appear - no duplicate removal
-          const sections = ingredientsWithSections;
-          return sections;
+          finalIngredients = ingredientsWithSections;
     } else if (cleanedIngredients.length > 0) {
       const parsedItems = cleanedIngredients.map((ing: string) => {
         const parsed = this.parseIngredientText(ing);
