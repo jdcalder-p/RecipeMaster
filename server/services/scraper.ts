@@ -123,9 +123,12 @@ export class RecipeScraper {
       return ing;
     });
 
-    // Clean and deduplicate ingredients completely
-    const cleanedIngredients = this.cleanAndDeduplicateIngredients(rawIngredients);
-    console.log(`🥗 FINAL UNIQUE INGREDIENTS:`, cleanedIngredients);
+    // Clean ingredients but don't deduplicate across sections yet
+    const cleanedIngredients = rawIngredients
+      .map(ing => ing.trim())
+      .filter(ing => ing.length > 0 && this.looksLikeIngredient(ing))
+      .filter(ing => ing.length < 200);
+    console.log(`🥗 CLEANED INGREDIENTS (no deduplication):`, cleanedIngredients);
 
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
@@ -251,50 +254,59 @@ export class RecipeScraper {
       }
 
       // Create sections with proper names - only if they have ingredients
+      // Only deduplicate within each individual section, not across sections
       if (pasteIngredients.length > 0) {
+        const parsedPasteItems = pasteIngredients.map((ing: string) => {
+          const parsed = this.parseIngredientText(ing);
+          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+          return parsed;
+        });
+        
         structuredIngredients.push({
           sectionName: "Paste",
-          items: pasteIngredients.map((ing: string) => {
-            const parsed = this.parseIngredientText(ing);
-            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-            return parsed;
-          })
+          items: this.removeDuplicateIngredientItems(parsedPasteItems)
         });
         console.log(`🏗️ Created "Paste" section with ${pasteIngredients.length} ingredients:`, pasteIngredients);
       }
 
       if (rollsIngredients.length > 0) {
+        const parsedRollsItems = rollsIngredients.map((ing: string) => {
+          const parsed = this.parseIngredientText(ing);
+          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+          return parsed;
+        });
+        
         structuredIngredients.push({
           sectionName: "Rolls",
-          items: rollsIngredients.map((ing: string) => {
-            const parsed = this.parseIngredientText(ing);
-            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-            return parsed;
-          })
+          items: this.removeDuplicateIngredientItems(parsedRollsItems)
         });
         console.log(`🏗️ Created "Rolls" section with ${rollsIngredients.length} ingredients:`, rollsIngredients);
       }
 
       if (fillingIngredients.length > 0) {
+        const parsedFillingItems = fillingIngredients.map((ing: string) => {
+          const parsed = this.parseIngredientText(ing);
+          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+          return parsed;
+        });
+        
         structuredIngredients.push({
           sectionName: "Cinnamon Filling",
-          items: fillingIngredients.map((ing: string) => {
-            const parsed = this.parseIngredientText(ing);
-            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-            return parsed;
-          })
+          items: this.removeDuplicateIngredientItems(parsedFillingItems)
         });
         console.log(`🏗️ Created "Cinnamon Filling" section with ${fillingIngredients.length} ingredients:`, fillingIngredients);
       }
 
       if (icingIngredients.length > 0) {
+        const parsedIcingItems = icingIngredients.map((ing: string) => {
+          const parsed = this.parseIngredientText(ing);
+          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+          return parsed;
+        });
+        
         structuredIngredients.push({
           sectionName: "Icing",
-          items: icingIngredients.map((ing: string) => {
-            const parsed = this.parseIngredientText(ing);
-            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-            return parsed;
-          })
+          items: this.removeDuplicateIngredientItems(parsedIcingItems)
         });
         console.log(`🏗️ Created "Icing" section with ${icingIngredients.length} ingredients:`, icingIngredients);
       }
@@ -309,7 +321,7 @@ export class RecipeScraper {
 
         structuredIngredients.push({
           sectionName: "Additional Ingredients",
-          items: unassignedParsed
+          items: this.removeDuplicateIngredientItems(unassignedParsed)
         });
         console.log(`📝 Created "Additional Ingredients" section with ${unassigned.length} ingredients:`, unassigned);
       }
@@ -433,13 +445,15 @@ export class RecipeScraper {
         // Fallback to single section if no instruction sections found
         console.log(`📝 No instruction sections found, creating single ingredient section`);
         if (cleanedIngredients.length > 0) {
+          const parsedItems = cleanedIngredients.map((ing: string) => {
+            const parsed = this.parseIngredientText(ing);
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          });
+          
           structuredIngredients.push({ 
             sectionName: undefined,
-            items: cleanedIngredients.map((ing: string) => {
-              const parsed = this.parseIngredientText(ing);
-              parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-              return parsed;
-            }) 
+            items: this.removeDuplicateIngredientItems(parsedItems)
           });
         }
       }
@@ -656,9 +670,12 @@ export class RecipeScraper {
       ? [{ steps: instructionsWithImages }]
       : [{ steps: [{ text: "Instructions not available. Please refer to the source URL for cooking instructions." }] }];
 
-    // Clean up ingredients and ensure no duplicates
+    // Clean up ingredients but don't deduplicate across sections
     const cleanedIngredients = ingredients.filter(Boolean).length > 0 
-      ? this.cleanAndDeduplicateIngredients(ingredients.filter(Boolean))
+      ? ingredients.filter(Boolean)
+          .map(ing => ing.trim())
+          .filter(ing => ing.length > 0 && this.looksLikeIngredient(ing))
+          .filter(ing => ing.length < 200)
       : [];
 
     // Only use the best available ingredients source (no mixing that causes duplicates)
