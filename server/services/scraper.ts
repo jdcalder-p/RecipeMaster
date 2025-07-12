@@ -682,10 +682,7 @@ if (icingIngredients.length > 0) {
 
     if (ingredientsWithSections.length > 0) {
       // Keep all ingredients exactly as they appear - no duplicate removal
-          sections.push({
-            sectionName: undefined,
-            items: ingredients
-          });
+          const sections = ingredientsWithSections;
           return sections;
     } else if (cleanedIngredients.length > 0) {
       const parsedItems = cleanedIngredients.map((ing: string) => {
@@ -694,6 +691,7 @@ if (icingIngredients.length > 0) {
         return parsed;
       });
 
+      // Create final ingredients structure
       finalIngredients = [{ 
         items: parsedItems
       }];
@@ -772,6 +770,7 @@ if (icingIngredients.length > 0) {
               instructions.push(text);
               seenTexts.add(text);
               console.log(`Found instruction paragraph: ${text.substring(0, 50)}...`);
+            ```
             }
           }
         });
@@ -1529,7 +1528,8 @@ if (icingIngredients.length > 0) {
     const hasImageExtension = imageExtensions.test(src);
 
     // Allow if it has image extension or contains image-like patterns (but not advertisements)
-    const imagePatterns = /\.(jpg|jpeg|png|gif|webp|avif)|image|photo|picture|wp-content|recipe|food|dish/i;
+    const imagePatterns = /\.(jpg|jpeg|png|gif|webp|avif)|image|photo|picture|wp-content|<previous_generation>```
+|recipe|food|dish/i;
 
     // Check alt text for recipe-related content (but not advertisement content)
     const altIsRecipeRelated = alt && /recipe|food|dish|cooking|ingredient|step|instruction/i.test(alt) && 
