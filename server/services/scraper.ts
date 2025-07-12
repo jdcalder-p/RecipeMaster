@@ -681,21 +681,12 @@ if (icingIngredients.length > 0) {
     }> = [];
 
     if (ingredientsWithSections.length > 0) {
-      // If we have sectioned ingredients, use those exactly as they appear
-      finalIngredients = ingredientsWithSections.map(section => ({
-        ...section,
-        items: section.items.map((item) => {
-          if (typeof item === 'string') {
-            const parsed = this.parseIngredientText(item);
-            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-            return parsed;
-          }
-          return {
-            ...item,
-            name: item.name.charAt(0).toUpperCase() + item.name.slice(1)
-          };
-        })
-      }));
+      // Keep all ingredients exactly as they appear - no duplicate removal
+          sections.push({
+            sectionName: undefined,
+            items: ingredients
+          });
+          return sections;
     } else if (cleanedIngredients.length > 0) {
       const parsedItems = cleanedIngredients.map((ing: string) => {
         const parsed = this.parseIngredientText(ing);
@@ -1087,18 +1078,12 @@ if (icingIngredients.length > 0) {
         }
       }
 
-      // Remove duplicates based on name
-      const uniqueIngredients = ingredients.filter((ingredient, index, self) =>
-        index === self.findIndex(other => other.name.toLowerCase() === ingredient.name.toLowerCase())
-      );
-
-      if (uniqueIngredients.length > 0) {
-        sections.push({
-          sectionName: undefined,
-          items: uniqueIngredients
-        });
-        return sections;
-      }
+      // Keep all ingredients exactly as they appear - no duplicate removal
+          sections.push({
+            sectionName: undefined,
+            items: ingredients
+          });
+          return sections;
     }
 
     // Try to find sections with headings followed by ingredient lists
