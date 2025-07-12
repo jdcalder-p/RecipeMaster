@@ -770,7 +770,6 @@ if (icingIngredients.length > 0) {
               instructions.push(text);
               seenTexts.add(text);
               console.log(`Found instruction paragraph: ${text.substring(0, 50)}...`);
-            ```
             }
           }
         });
@@ -1528,8 +1527,7 @@ if (icingIngredients.length > 0) {
     const hasImageExtension = imageExtensions.test(src);
 
     // Allow if it has image extension or contains image-like patterns (but not advertisements)
-    const imagePatterns = /\.(jpg|jpeg|png|gif|webp|avif)|image|photo|picture|wp-content|<previous_generation>```
-|recipe|food|dish/i;
+    const imagePatterns = /\.(jpg|jpeg|png|gif|webp|avif)|image|photo|picture|wp-content|recipe|food|dish/i;
 
     // Check alt text for recipe-related content (but not advertisement content)
     const altIsRecipeRelated = alt && /recipe|food|dish|cooking|ingredient|step|instruction/i.test(alt) && 
