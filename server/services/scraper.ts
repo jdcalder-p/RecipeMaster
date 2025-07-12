@@ -198,9 +198,9 @@ export class RecipeScraper {
         cleanedIngredients.push("3 2/3 c bread flour");
       }
 
+      // Process each ingredient exactly once - no duplicates allowed
       for (const ingredient of cleanedIngredients) {
         const lowerIng = ingredient.toLowerCase();
-        let assigned = false;
         console.log(`🔍 Processing ingredient: "${ingredient}"`);
 
         // Paste ingredients (for tangzhong/starter) - check first to avoid conflicts
@@ -209,7 +209,6 @@ export class RecipeScraper {
             (lowerIng.includes('hot') && (lowerIng.includes('water') || lowerIng.includes('tap water'))) ||
             (lowerIng.includes('water') && lowerIng.includes('1/2') && lowerIng.includes('c'))) {
           pasteIngredients.push(ingredient);
-          assigned = true;
           console.log(`✅ Assigned to Paste: "${ingredient}"`);
         }
 
@@ -224,7 +223,6 @@ export class RecipeScraper {
                  (lowerIng.includes('salt') && !lowerIng.includes('salted') && lowerIng.includes('1') && lowerIng.includes('tsp')) ||
                  (lowerIng.includes('cream') && lowerIng.includes('heavy') && lowerIng.includes('whip'))) {
           rollsIngredients.push(ingredient);
-          assigned = true;
           console.log(`✅ Assigned to Rolls: "${ingredient}"`);
         }
 
@@ -233,7 +231,6 @@ export class RecipeScraper {
                  (lowerIng.includes('cinnamon') && !lowerIng.includes('roll') && lowerIng.includes('2') && lowerIng.includes('tbsp')) ||
                  (lowerIng.includes('butter') && lowerIng.includes('softened') && lowerIng.includes('8'))) {
           fillingIngredients.push(ingredient);
-          assigned = true;
           console.log(`✅ Assigned to Cinnamon Filling: "${ingredient}"`);
         }
 
@@ -243,18 +240,17 @@ export class RecipeScraper {
                  (lowerIng.includes('powdered sugar') && lowerIng.includes('2') && lowerIng.includes('c')) ||
                  (lowerIng.includes('vanilla') && lowerIng.includes('1/2') && lowerIng.includes('tbsp'))) {
           icingIngredients.push(ingredient);
-          assigned = true;
           console.log(`✅ Assigned to Icing: "${ingredient}"`);
         }
 
-        if (!assigned) {
+        else {
           unassigned.push(ingredient);
           console.log(`❓ Unassigned: "${ingredient}"`);
         }
       }
 
       // Create sections with proper names - only if they have ingredients
-      // Preserve all ingredients as they appear in the original recipe
+      // Keep all ingredients exactly as they appear in the original recipe
         if (pasteIngredients.length > 0) {
           const parsedPasteItems = pasteIngredients.map((ing: string) => {
             const parsed = this.parseIngredientText(ing);
@@ -678,14 +674,14 @@ if (icingIngredients.length > 0) {
           .filter(ing => ing.length < 200)
       : [];
 
-    // Only use the best available ingredients source (no mixing that causes duplicates)
+    // Use the best available ingredients source without any replacement or duplication removal
     let finalIngredients: Array<{
       sectionName?: string;
       items: Array<{ name: string; quantity?: string; unit?: string; }>;
     }> = [];
 
     if (ingredientsWithSections.length > 0) {
-      // If we have sectioned ingredients, use only those and remove duplicates within sections
+      // If we have sectioned ingredients, use those exactly as they appear
       finalIngredients = ingredientsWithSections.map(section => ({
         ...section,
         items: section.items.map((item) => {
