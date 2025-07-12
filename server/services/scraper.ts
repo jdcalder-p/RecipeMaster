@@ -772,7 +772,6 @@ export class RecipeScraper {
           }
         });
 
-        ```text
         // Look for list items within content
         $content.find('ol li, ul li').each((_, el) => {
           const text = $(el).text().trim();
