@@ -254,77 +254,77 @@ export class RecipeScraper {
       }
 
       // Create sections with proper names - only if they have ingredients
-      // Only deduplicate within each individual section, not across sections
-      if (pasteIngredients.length > 0) {
-        const parsedPasteItems = pasteIngredients.map((ing: string) => {
-          const parsed = this.parseIngredientText(ing);
-          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-          return parsed;
-        });
-        
-        structuredIngredients.push({
-          sectionName: "Paste",
-          items: this.removeDuplicateIngredientItems(parsedPasteItems)
-        });
-        console.log(`🏗️ Created "Paste" section with ${pasteIngredients.length} ingredients:`, pasteIngredients);
-      }
+      // Preserve all ingredients as they appear in the original recipe
+        if (pasteIngredients.length > 0) {
+          const parsedPasteItems = pasteIngredients.map((ing: string) => {
+            const parsed = this.parseIngredientText(ing);
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          });
 
-      if (rollsIngredients.length > 0) {
-        const parsedRollsItems = rollsIngredients.map((ing: string) => {
-          const parsed = this.parseIngredientText(ing);
-          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-          return parsed;
-        });
-        
-        structuredIngredients.push({
-          sectionName: "Rolls",
-          items: this.removeDuplicateIngredientItems(parsedRollsItems)
-        });
-        console.log(`🏗️ Created "Rolls" section with ${rollsIngredients.length} ingredients:`, rollsIngredients);
-      }
+          structuredIngredients.push({
+            sectionName: "Paste",
+            items: parsedPasteItems
+          });
+          console.log(`🏗️ Created "Paste" section with ${pasteIngredients.length} ingredients:`, pasteIngredients);
+        }
 
-      if (fillingIngredients.length > 0) {
-        const parsedFillingItems = fillingIngredients.map((ing: string) => {
-          const parsed = this.parseIngredientText(ing);
-          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-          return parsed;
-        });
-        
-        structuredIngredients.push({
-          sectionName: "Cinnamon Filling",
-          items: this.removeDuplicateIngredientItems(parsedFillingItems)
-        });
-        console.log(`🏗️ Created "Cinnamon Filling" section with ${fillingIngredients.length} ingredients:`, fillingIngredients);
-      }
+if (rollsIngredients.length > 0) {
+          const parsedRollsItems = rollsIngredients.map((ing: string) => {
+            const parsed = this.parseIngredientText(ing);
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          });
 
-      if (icingIngredients.length > 0) {
-        const parsedIcingItems = icingIngredients.map((ing: string) => {
-          const parsed = this.parseIngredientText(ing);
-          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-          return parsed;
-        });
-        
-        structuredIngredients.push({
-          sectionName: "Icing",
-          items: this.removeDuplicateIngredientItems(parsedIcingItems)
-        });
-        console.log(`🏗️ Created "Icing" section with ${icingIngredients.length} ingredients:`, icingIngredients);
-      }
+          structuredIngredients.push({
+            sectionName: "Rolls",
+            items: parsedRollsItems
+          });
+          console.log(`🏗️ Created "Rolls" section with ${rollsIngredients.length} ingredients:`, rollsIngredients);
+        }
+
+if (fillingIngredients.length > 0) {
+          const parsedFillingItems = fillingIngredients.map((ing: string) => {
+            const parsed = this.parseIngredientText(ing);
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          });
+
+          structuredIngredients.push({
+            sectionName: "Cinnamon Filling",
+            items: parsedFillingItems
+          });
+          console.log(`🏗️ Created "Cinnamon Filling" section with ${fillingIngredients.length} ingredients:`, fillingIngredients);
+        }
+
+if (icingIngredients.length > 0) {
+          const parsedIcingItems = icingIngredients.map((ing: string) => {
+            const parsed = this.parseIngredientText(ing);
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          });
+
+          structuredIngredients.push({
+            sectionName: "Icing",
+            items: parsedIcingItems
+          });
+          console.log(`🏗️ Created "Icing" section with ${icingIngredients.length} ingredients:`, icingIngredients);
+        }
 
       // Add any unassigned ingredients to a general section
-      if (unassigned.length > 0) {
-        const unassignedParsed = unassigned.map((ing: string) => {
-          const parsed = this.parseIngredientText(ing);
-          parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
-          return parsed;
-        });
+        if (unassigned.length > 0) {
+          const unassignedParsed = unassigned.map((ing: string) => {
+            const parsed = this.parseIngredientText(ing);
+            parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
+            return parsed;
+          });
 
-        structuredIngredients.push({
-          sectionName: "Additional Ingredients",
-          items: this.removeDuplicateIngredientItems(unassignedParsed)
-        });
-        console.log(`📝 Created "Additional Ingredients" section with ${unassigned.length} ingredients:`, unassigned);
-      }
+          structuredIngredients.push({
+            sectionName: "Additional Ingredients",
+            items: unassignedParsed
+          });
+          console.log(`📝 Created "Additional Ingredients" section with ${unassigned.length} ingredients:`, unassigned);
+        }
 
 
 
@@ -450,10 +450,10 @@ export class RecipeScraper {
             parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
             return parsed;
           });
-          
+
           structuredIngredients.push({ 
             sectionName: undefined,
-            items: this.removeDuplicateIngredientItems(parsedItems)
+            items: parsedItems
           });
         }
       }
@@ -688,7 +688,7 @@ export class RecipeScraper {
       // If we have sectioned ingredients, use only those and remove duplicates within sections
       finalIngredients = ingredientsWithSections.map(section => ({
         ...section,
-        items: this.removeDuplicateIngredientItems(section.items.map((item) => {
+        items: section.items.map((item) => {
           if (typeof item === 'string') {
             const parsed = this.parseIngredientText(item);
             parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
@@ -698,7 +698,7 @@ export class RecipeScraper {
             ...item,
             name: item.name.charAt(0).toUpperCase() + item.name.slice(1)
           };
-        }))
+        })
       }));
     } else if (cleanedIngredients.length > 0) {
       const parsedItems = cleanedIngredients.map((ing: string) => {
@@ -708,7 +708,7 @@ export class RecipeScraper {
       });
 
       finalIngredients = [{ 
-        items: this.removeDuplicateIngredientItems(parsedItems)
+        items: parsedItems
       }];
     }
 
@@ -779,7 +779,7 @@ export class RecipeScraper {
         // Look for paragraphs with cooking instructions
         $content.find('p').each((_, el) => {
           const text = $(el).text().trim();
-          if (text.length > 30 && text.length < 1000 && !seenTexts.has(text)) {
+          if (text.length > 30 && text.length < 1000 && !seenTexts.has(text)){
             const hasActionWords = /\b(heat|cook|add|mix|stir|bake|place|remove|season|serve|combine|wash|wrap|allow|cool|grate|transfer|top with|spread|until|minutes?|hours?|degrees?|preheat|thoroughly|skillet|oven|bowl|dish)\b/i.test(text);
             if (hasActionWords) {
               instructions.push(text);
