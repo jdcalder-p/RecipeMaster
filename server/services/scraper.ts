@@ -674,23 +674,23 @@ if (icingIngredients.length > 0) {
           .filter(ing => ing.length < 200)
       : [];
 
-    // Use the best available ingredients source without any replacement or duplication removal
+    // Use only ingredients from the structured sections to avoid duplication
     let finalIngredients: Array<{
       sectionName?: string;
       items: Array<{ name: string; quantity?: string; unit?: string; }>;
     }> = [];
 
     if (ingredientsWithSections.length > 0) {
-      // Keep all ingredients exactly as they appear - no duplicate removal
-          finalIngredients = ingredientsWithSections;
+      // Use structured ingredients sections only
+      finalIngredients = ingredientsWithSections;
     } else if (cleanedIngredients.length > 0) {
+      // Only use basic ingredients if no structured sections were found
       const parsedItems = cleanedIngredients.map((ing: string) => {
         const parsed = this.parseIngredientText(ing);
         parsed.name = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1);
         return parsed;
       });
 
-      // Create final ingredients structure
       finalIngredients = [{ 
         items: parsedItems
       }];
