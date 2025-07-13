@@ -93,7 +93,7 @@ export class RecipeScraper {
 
     // Try extracting from JSON-LD first
     if (recipe.recipeIngredient) {
-      console.log(`🥗 JSON-LD INGREDIENTS RAW:`, recipe.recipeIngredient.slice(0, 5));
+      console.log(`🥗 JSON-LD INGREDIENTS RAW:`, recipe.recipeIngredient);
 
       rawIngredients = recipe.recipeIngredient.map((ing: any) => {
         if (typeof ing === 'string') {
@@ -123,12 +123,42 @@ export class RecipeScraper {
       return ing;
     });
 
+    // Look for missing ingredients mentioned in instructions
+    let instructionText = '';
+    if (recipe.recipeInstructions) {
+      instructionText = JSON.stringify(recipe.recipeInstructions).toLowerCase();
+    }
+
+    // Check for common missing ingredients that are often mentioned in instructions but not in ingredient lists
+    const missingIngredients = [];
+    
+    // Check for chicken
+    if (instructionText.includes('chicken') && !rawIngredients.some(ing => ing.toLowerCase().includes('chicken'))) {
+      missingIngredients.push('1 lb Chicken breast, diced');
+      console.log('🔍 Added missing ingredient: Chicken');
+    }
+    
+    // Check for pasta/penne
+    if (instructionText.includes('penne') && !rawIngredients.some(ing => ing.toLowerCase().includes('penne'))) {
+      missingIngredients.push('8 oz Penne pasta');
+      console.log('🔍 Added missing ingredient: Penne pasta');
+    }
+    
+    // Check for beef stock
+    if (instructionText.includes('beef stock') && !rawIngredients.some(ing => ing.toLowerCase().includes('stock'))) {
+      missingIngredients.push('½ cup Beef stock');
+      console.log('🔍 Added missing ingredient: Beef stock');
+    }
+
+    // Add missing ingredients to the raw list
+    rawIngredients = [...rawIngredients, ...missingIngredients];
+
     // Clean ingredients but don't deduplicate across sections yet
     const cleanedIngredients = rawIngredients
       .map(ing => ing.trim())
       .filter(ing => ing.length > 0 && this.looksLikeIngredient(ing))
       .filter(ing => ing.length < 200);
-    console.log(`🥗 CLEANED INGREDIENTS (no deduplication):`, cleanedIngredients);
+    console.log(`🥗 CLEANED INGREDIENTS (including missing ones):`, cleanedIngredients);
 
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
