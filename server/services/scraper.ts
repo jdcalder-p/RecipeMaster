@@ -153,12 +153,13 @@ export class RecipeScraper {
     // Add missing ingredients to the raw list
     rawIngredients = [...rawIngredients, ...missingIngredients];
 
-    // Clean ingredients but don't deduplicate across sections yet
+    // Use raw ingredients directly from JSON-LD without aggressive filtering
+    // Only do basic trimming and length checks
     const cleanedIngredients = rawIngredients
       .map(ing => ing.trim())
-      .filter(ing => ing.length > 0 && this.looksLikeIngredient(ing))
-      .filter(ing => ing.length < 200);
-    console.log(`🥗 CLEANED INGREDIENTS (including missing ones):`, cleanedIngredients);
+      .filter(ing => ing.length > 0)
+      .filter(ing => ing.length < 500); // More generous length limit
+    console.log(`🥗 USING RAW JSON-LD INGREDIENTS DIRECTLY:`, cleanedIngredients);
     console.log(`🥗 FINAL CLEANED INGREDIENTS LIST:`, cleanedIngredients);
 
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
