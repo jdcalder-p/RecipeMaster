@@ -159,6 +159,7 @@ export class RecipeScraper {
       .filter(ing => ing.length > 0 && this.looksLikeIngredient(ing))
       .filter(ing => ing.length < 200);
     console.log(`🥗 CLEANED INGREDIENTS (including missing ones):`, cleanedIngredients);
+    console.log(`🥗 FINAL CLEANED INGREDIENTS LIST:`, cleanedIngredients);
 
     let instructions = this.parseInstructions(recipe.recipeInstructions || []);
     console.log(`📋 JSON-LD INSTRUCTIONS RAW:`, JSON.stringify(recipe.recipeInstructions, null, 2));
@@ -481,6 +482,8 @@ if (icingIngredients.length > 0) {
             sectionName: undefined,
             items: parsedItems
           });
+          console.log(`📝 Created single section with ${parsedItems.length} ingredients including missing ones`);
+          console.log(`📝 Final ingredients in section:`, parsedItems.map(item => item.name));
         }
       }
     }
